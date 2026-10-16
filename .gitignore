@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+.rsbuild/
+.output/
+*.tsbuildinfo
+
+# cloudflare
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# tests
+coverage/
+
+# env
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# turbo
+.turbo/
