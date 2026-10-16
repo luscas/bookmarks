@@ -81,7 +81,7 @@ start-all: install env migrate
       if lsof -ti:"${1}" >/dev/null 2>&1; then
         echo "==> erro: a porta ${1} já está em uso por:"
         lsof -i:"${1}" | sed -n '2,4p'
-        echo "    Encerre o processo acima (ex.: pkill -f 'wrangler dev') e tente de novo."
+        echo "    Encerre o processo acima (ex.: lsof -ti:${1} | xargs kill) e tente de novo."
         exit 1
       fi
     }
@@ -90,8 +90,16 @@ start-all: install env migrate
       trap - EXIT INT TERM
       echo ""
       echo "==> encerrando serviços…"
+      local pid
       for pid in "${pids[@]:-}"; do
-        { kill -- "-${pid}" 2>/dev/null || kill "${pid}" 2>/dev/null; } || true
+        [ -n "${pid}" ] || continue
+        kill -TERM -- "-${pid}" 2>/dev/null || kill -TERM "${pid}" 2>/dev/null || true
+      done
+      sleep 0.3
+      # A stopped process ignores SIGTERM until continued, so finish with SIGKILL.
+      for pid in "${pids[@]:-}"; do
+        [ -n "${pid}" ] || continue
+        kill -KILL -- "-${pid}" 2>/dev/null || kill -KILL "${pid}" 2>/dev/null || true
       done
       wait 2>/dev/null || true
       echo "==> pronto."
@@ -102,29 +110,37 @@ start-all: install env migrate
     ensure_free_port "${web_port}"
 
     wait_for_api() {
-      for _ in $(seq 1 120); do
+      for _ in {1..120}; do
         if curl -fsS "${api_url}/api/health" >/dev/null 2>&1; then
           return 0
         fi
         sleep 0.5
       done
-      echo "==> aviso: a API não respondeu em ${api_url}/api/health (seguindo mesmo assim)"
-      return 0
+      echo "==> erro: a API não respondeu em ${api_url}/api/health após 60s." >&2
+      local log
+      log="$(ls -t "${HOME}"/.wrangler/logs/wrangler-*.log 2>/dev/null | head -1 || true)"
+      if [ -n "${log}" ]; then
+        echo "    Últimas linhas de ${log}:" >&2
+        tail -n 8 "${log}" >&2 || true
+      fi
+      exit 1
     }
 
     echo "==> API        ${api_url}"
-    pnpm --filter "@bookmarks/server" dev &
+    # stdin from /dev/null: with job control ("set -m") a background job that reads
+    # the terminal is stopped by SIGTTIN — which made `wrangler dev` hang forever.
+    pnpm --filter "@bookmarks/server" dev </dev/null &
     pids+=("$!")
 
     echo "==> aguardando a API ficar pronta…"
     wait_for_api
 
     echo "==> SPA        ${web_url}"
-    pnpm --filter "@bookmarks/web" dev &
+    pnpm --filter "@bookmarks/web" dev </dev/null &
     pids+=("$!")
 
     echo "==> extensão   apps/extension/dist (watch) — carregue em chrome://extensions"
-    pnpm --filter "@bookmarks/extension" exec rsbuild build --watch &
+    pnpm --filter "@bookmarks/extension" exec rsbuild build --watch </dev/null &
     pids+=("$!")
 
     echo ""
