@@ -18,7 +18,7 @@ export function slugifyTag(name: string): string {
   return normalizeTagName(name)
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // strip diacritics
+    .replace(/\p{M}/gu, "") // strip combining marks (diacritics)
     .replace(/\s*\/\s*/g, "/") // collapse spaces around the hierarchy separator
     .replace(/[^a-z0-9/_\s-]/g, "")
     .replace(/\s+/g, "-")

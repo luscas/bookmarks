@@ -34,7 +34,9 @@ function isRootFolder(segment: string): boolean {
 export function folderPathToTagName(folderPath: readonly string[] | undefined): string | undefined {
   if (!folderPath || folderPath.length === 0) return undefined;
 
-  const parts = folderPath.map(normalizeTagName).filter((part) => part.length > 0 && !isRootFolder(part));
+  const parts = folderPath
+    .map(normalizeTagName)
+    .filter((part) => part.length > 0 && !isRootFolder(part));
   if (parts.length === 0) return undefined;
 
   return parts.join("/");

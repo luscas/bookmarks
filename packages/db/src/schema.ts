@@ -41,15 +41,21 @@ const epochMs = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
 
 /* ------------------------------------------------------------------ Better Auth */
 
-export const user = sqliteTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: integer("email_verified", { mode: "boolean" }).notNull(),
-  image: text("image"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
-});
+export const user = sqliteTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: integer("email_verified", { mode: "boolean" }).notNull(),
+    image: text("image"),
+    /** Added by the Better Auth `username` plugin. */
+    username: text("username"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
+  },
+  (table) => [unique("user_username_unique").on(table.username)],
+);
 
 export const session = sqliteTable("session", {
   id: text("id").primaryKey(),
@@ -91,32 +97,45 @@ export const verification = sqliteTable("verification", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
 });
 
-/** Table added by the `@better-auth/api-key` plugin. */
-export const apikey = sqliteTable("apikey", {
-  id: text("id").primaryKey(),
-  name: text("name"),
-  start: text("start"),
-  prefix: text("prefix"),
-  key: text("key").notNull().unique(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  refillInterval: integer("refill_interval"),
-  refillAmount: integer("refill_amount"),
-  lastRefillAt: integer("last_refill_at", { mode: "timestamp_ms" }),
-  enabled: integer("enabled", { mode: "boolean" }).default(true),
-  rateLimitEnabled: integer("rate_limit_enabled", { mode: "boolean" }).default(true),
-  rateLimitTimeWindow: integer("rate_limit_time_window").default(86_400_000),
-  rateLimitMax: integer("rate_limit_max").default(10),
-  requestCount: integer("request_count").default(0),
-  remaining: integer("remaining"),
-  lastRequest: integer("last_request", { mode: "timestamp_ms" }),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
-  permissions: text("permissions"),
-  metadata: text("metadata"),
-});
+/**
+ * Table added by the `@better-auth/api-key` plugin.
+ *
+ * The column property names must match the plugin's field names (`configId`,
+ * `referenceId`) because the Drizzle adapter indexes tables by property name.
+ */
+export const apikey = sqliteTable(
+  "apikey",
+  {
+    id: text("id").primaryKey(),
+    configId: text("config_id").notNull().default("default"),
+    name: text("name"),
+    start: text("start"),
+    prefix: text("prefix"),
+    key: text("key").notNull().unique(),
+    referenceId: text("reference_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    refillInterval: integer("refill_interval"),
+    refillAmount: integer("refill_amount"),
+    lastRefillAt: integer("last_refill_at", { mode: "timestamp_ms" }),
+    enabled: integer("enabled", { mode: "boolean" }).default(true),
+    rateLimitEnabled: integer("rate_limit_enabled", { mode: "boolean" }).default(true),
+    rateLimitTimeWindow: integer("rate_limit_time_window").default(86_400_000),
+    rateLimitMax: integer("rate_limit_max").default(10),
+    requestCount: integer("request_count").default(0),
+    remaining: integer("remaining"),
+    lastRequest: integer("last_request", { mode: "timestamp_ms" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(epochMs),
+    permissions: text("permissions"),
+    metadata: text("metadata"),
+  },
+  (table) => [
+    index("apikey_reference_id_idx").on(table.referenceId),
+    index("apikey_config_id_idx").on(table.configId),
+  ],
+);
 
 /* ------------------------------------------------------------------- bookmarks */
 

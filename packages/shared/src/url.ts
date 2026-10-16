@@ -80,7 +80,10 @@ export function normalizeUrl(input: string): string {
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
   url.hostname = host;
 
-  if ((url.protocol === "https:" && url.port === "443") || (url.protocol === "http:" && url.port === "80")) {
+  if (
+    (url.protocol === "https:" && url.port === "443") ||
+    (url.protocol === "http:" && url.port === "80")
+  ) {
     url.port = "";
   }
 

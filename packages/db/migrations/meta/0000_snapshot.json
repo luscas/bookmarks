@@ -287,6 +287,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "config_id": {
+          "name": "config_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'default'"
+        },
         "name": {
           "name": "name",
           "type": "text",
@@ -315,8 +323,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "user_id": {
-          "name": "user_id",
+        "reference_id": {
+          "name": "reference_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -440,14 +448,24 @@
           "name": "apikey_key_unique",
           "columns": ["key"],
           "isUnique": true
+        },
+        "apikey_reference_id_idx": {
+          "name": "apikey_reference_id_idx",
+          "columns": ["reference_id"],
+          "isUnique": false
+        },
+        "apikey_config_id_idx": {
+          "name": "apikey_config_id_idx",
+          "columns": ["config_id"],
+          "isUnique": false
         }
       },
       "foreignKeys": {
-        "apikey_user_id_user_id_fk": {
-          "name": "apikey_user_id_user_id_fk",
+        "apikey_reference_id_user_id_fk": {
+          "name": "apikey_reference_id_user_id_fk",
           "tableFrom": "apikey",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
+          "columnsFrom": ["reference_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -927,6 +945,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -948,6 +973,11 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "columns": ["email"],
+          "isUnique": true
+        },
+        "user_username_unique": {
+          "name": "user_username_unique",
+          "columns": ["username"],
           "isUnique": true
         }
       },

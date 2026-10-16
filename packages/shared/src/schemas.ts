@@ -98,7 +98,10 @@ export type CreateTagInput = z.infer<typeof createTagSchema>;
 export const updateTagSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .nullable(),
   })
   .partial();
 export type UpdateTagInput = z.infer<typeof updateTagSchema>;

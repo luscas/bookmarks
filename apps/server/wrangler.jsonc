@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bookmarks",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "BETTER_AUTH_URL": "http://localhost:8787",
+    "TRUSTED_ORIGINS": "http://localhost:5173"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bookmarks",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../db/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FAVICONS",
+      "bucket_name": "bookmarks-favicons"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "AI_QUEUE",
+        "queue": "bookmarks-ai"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "bookmarks-ai",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "bookmarks-ai-dlq"
+      }
+    ]
+  },
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  }
+}
