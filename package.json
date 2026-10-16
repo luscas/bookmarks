@@ -15,8 +15,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:generate": "pnpm --filter @bookmarks/db db:generate",
-    "db:migrate:local": "pnpm --filter @bookmarks/db db:migrate:local",
-    "db:migrate:remote": "pnpm --filter @bookmarks/db db:migrate:remote"
+    "db:migrate:local": "pnpm --filter @bookmarks/server exec wrangler d1 migrations apply bookmarks --local",
+    "db:migrate:remote": "pnpm --filter @bookmarks/server exec wrangler d1 migrations apply bookmarks --remote"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

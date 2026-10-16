@@ -1,4 +1,4 @@
-import { AI_BATCH_SIZE } from "@bookmarks/shared";
+import { AI_BATCH_SIZE, MAX_AI_RESPONSE_BYTES } from "@bookmarks/shared";
 import { AiProviderError } from "./errors.js";
 import { buildProposeTaxonomyPrompt, buildSuggestTagsPrompt } from "./prompts.js";
 import type {
@@ -122,9 +122,65 @@ function* chunked<T>(items: T[], size: number): Generator<T[]> {
   }
 }
 
+/**
+ * Read a response body without buffering more than `MAX_AI_RESPONSE_BYTES`.
+ * A hostile or misconfigured provider must not be able to exhaust the worker's
+ * memory by streaming an unbounded body at us.
+ */
+async function readTextCapped(response: Response): Promise<string> {
+  const declared = Number(response.headers?.get?.("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > MAX_AI_RESPONSE_BYTES) {
+    throw new AiProviderError(
+      `AI provider response exceeded the ${MAX_AI_RESPONSE_BYTES}-byte limit.`,
+      { status: response.status },
+    );
+  }
+
+  const body = response.body;
+  if (!body) {
+    const text = await response.text();
+    if (text.length > MAX_AI_RESPONSE_BYTES) {
+      throw new AiProviderError(
+        `AI provider response exceeded the ${MAX_AI_RESPONSE_BYTES}-byte limit.`,
+        { status: response.status },
+      );
+    }
+    return text;
+  }
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    if (value) {
+      total += value.byteLength;
+      if (total > MAX_AI_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new AiProviderError(
+          `AI provider response exceeded the ${MAX_AI_RESPONSE_BYTES}-byte limit.`,
+          { status: response.status },
+        );
+      }
+      chunks.push(value);
+    }
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const part of chunks) {
+    merged.set(part, offset);
+    offset += part.byteLength;
+  }
+  return new TextDecoder().decode(merged);
+}
+
 async function readErrorMessage(response: Response): Promise<string | undefined> {
   try {
-    const text = (await response.text()).trim();
+    const text = (await readTextCapped(response)).trim();
     return text.length > 0 ? truncate(text) : undefined;
   } catch {
     return undefined;
@@ -293,7 +349,7 @@ async function completeChat(
     const response = await fetchImpl(url, requestInit);
 
     if (response.ok) {
-      const content = extractContentFromEnvelope(await response.text());
+      const content = extractContentFromEnvelope(await readTextCapped(response));
       if (content === undefined) {
         throw new AiProviderError("AI provider response did not contain any message content.", {
           status: response.status,

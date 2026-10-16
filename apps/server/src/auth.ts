@@ -1,5 +1,6 @@
 import { apiKey } from "@better-auth/api-key";
 import { createDb } from "@bookmarks/db";
+import { API_KEY_RATE_LIMIT_MAX, API_KEY_RATE_LIMIT_WINDOW_MS } from "@bookmarks/shared";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
@@ -31,6 +32,10 @@ export function parseTrustedOrigins(value: string | undefined): string[] {
  *   `enableSessionForAPIKeys`, `auth.api.getSession` returns a session for a
  *   request carrying the key header, so the rest of the server needs no special
  *   casing. The getter accepts both `x-api-key` and `Authorization: Bearer`.
+ *
+ * The `apiKey` plugin defaults to 10 requests per 24h, which throttles the
+ * extension to a handful of saves per day; we raise it to a generous hourly
+ * burst (see `API_KEY_RATE_LIMIT_*`, shared with the `apikey` column defaults).
  */
 export function createAuth(env: Env) {
   const db = createDb(env.DB);
@@ -44,6 +49,11 @@ export function createAuth(env: Env) {
       username({ displayUsername: false }),
       apiKey({
         enableSessionForAPIKeys: true,
+        rateLimit: {
+          enabled: true,
+          maxRequests: API_KEY_RATE_LIMIT_MAX,
+          timeWindow: API_KEY_RATE_LIMIT_WINDOW_MS,
+        },
         customAPIKeyGetter: (ctx) => {
           const authorization = ctx.headers?.get("authorization");
           if (authorization?.toLowerCase().startsWith("bearer ")) {

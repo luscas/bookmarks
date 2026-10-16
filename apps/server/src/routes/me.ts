@@ -1,3 +1,4 @@
+import type { Database } from "@bookmarks/db";
 import { bookmarks, tags, user as userTable } from "@bookmarks/db";
 import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -16,29 +17,34 @@ const createApiKeySchema = z.object({
 
 export const meRoutes = new Hono<AppBindings>();
 
-meRoutes.use("*", sessionMiddleware);
-
-meRoutes.get("/", async (c) => {
-  const user = requireUser(c);
-  const db = c.get("db");
+/** Bookmark and tag totals for the current user. */
+async function userCounts(
+  db: Database,
+  userId: string,
+): Promise<{ bookmarks: number; tags: number }> {
   const bookmarkCount = await db
     .select({ count: sql<number>`count(*)` })
     .from(bookmarks)
-    .where(eq(bookmarks.userId, user.id))
+    .where(eq(bookmarks.userId, userId))
     .get();
   const tagCount = await db
     .select({ count: sql<number>`count(*)` })
     .from(tags)
-    .where(eq(tags.userId, user.id))
+    .where(eq(tags.userId, userId))
     .get();
+  return {
+    bookmarks: Number(bookmarkCount?.count ?? 0),
+    tags: Number(tagCount?.count ?? 0),
+  };
+}
 
-  return c.json({
-    user,
-    counts: {
-      bookmarks: Number(bookmarkCount?.count ?? 0),
-      tags: Number(tagCount?.count ?? 0),
-    },
-  });
+meRoutes.use("*", sessionMiddleware);
+
+meRoutes.get("/", async (c) => {
+  const user = requireUser(c);
+  const counts = await userCounts(c.get("db"), user.id);
+
+  return c.json({ user, counts });
 });
 
 meRoutes.patch("/", async (c) => {
@@ -50,7 +56,10 @@ meRoutes.patch("/", async (c) => {
     .set({ name: input.name, updatedAt: new Date() })
     .where(eq(userTable.id, user.id));
 
-  return c.json({ user: { ...user, name: input.name } });
+  // Keep the response shape identical to GET /api/me so clients can reuse it.
+  const counts = await userCounts(c.get("db"), user.id);
+
+  return c.json({ user: { ...user, name: input.name }, counts });
 });
 
 meRoutes.get("/api-keys", async (c) => {

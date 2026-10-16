@@ -239,6 +239,7 @@ export interface ImportSummary {
   skipped: number;
   createdAt: string;
   finishedAt: string | null;
+  error: string | null;
 }
 
 const importSummarySchema = z.object({
@@ -250,6 +251,8 @@ const importSummarySchema = z.object({
   skipped: z.number(),
   createdAt: z.string(),
   finishedAt: z.string().nullable(),
+  // Matches `aiJobSchema`: a missing field from an older payload reads as null.
+  error: z.string().nullable().default(null),
 });
 
 export interface AiSettings {

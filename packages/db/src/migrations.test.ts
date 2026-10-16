@@ -1,10 +1,11 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import {
   MIGRATIONS,
+  MIGRATIONS_TABLE,
   MIGRATION_FILES,
   makeIdempotent,
   runMigrations,
@@ -18,6 +19,35 @@ function canonical(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
 }
 
+type Sqlite = InstanceType<typeof Database>;
+
+/** Adapter letting `runMigrations` drive better-sqlite3. */
+function createExecutor(db: Sqlite) {
+  return {
+    exec: (sql: string) => db.exec(sql),
+    all: (sql: string) => db.prepare(sql).all(),
+  };
+}
+
+function tableNames(db: Sqlite): string[] {
+  const rows = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{
+    name: string;
+  }>;
+  return rows.map((row) => row.name);
+}
+
+function columnNames(db: Sqlite, table: string): string[] {
+  const rows = db.prepare(`PRAGMA table_info(\`${table}\`)`).all() as Array<{ name: string }>;
+  return rows.map((row) => row.name);
+}
+
+function countRows(db: Sqlite, table: string): number {
+  const row = db.prepare(`SELECT count(*) AS count FROM \`${table}\``).get() as
+    | { count: number }
+    | undefined;
+  return row?.count ?? -1;
+}
+
 describe("migration metadata", () => {
   it("keeps the embedded SQL in sync with the files on disk", () => {
     for (const migration of MIGRATIONS) {
@@ -26,8 +56,14 @@ describe("migration metadata", () => {
     }
   });
 
-  it("exposes an ordered list of file names", () => {
-    expect(MIGRATION_FILES).toEqual(["0000_dusty_meggan.sql", "0001_fts5.sql"]);
+  it("accounts for every .sql file in the migrations directory, in order", () => {
+    const onDisk = readdirSync(migrationsDir)
+      .filter((file) => file.endsWith(".sql"))
+      .sort();
+
+    // Detects drift automatically: a new drizzle-kit migration that is not
+    // embedded above (or an embedded migration with no file) fails here.
+    expect(MIGRATION_FILES).toEqual(onDisk);
   });
 });
 
@@ -64,21 +100,54 @@ describe("makeIdempotent", () => {
 });
 
 describe("runMigrations", () => {
-  it("applies migrations and is safe to run twice", async () => {
+  it("applies every migration and is a no-op on the second run", async () => {
     const db = new Database(":memory:");
     try {
-      await runMigrations(db);
-      // A second run must not throw: every CREATE is rewritten to IF NOT EXISTS.
-      await runMigrations(db);
+      const executor = createExecutor(db);
+      await runMigrations(executor);
 
-      const tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-        .all() as Array<{ name: string }>;
-      const names = tables.map((table) => table.name);
-
+      const names = tableNames(db);
       expect(names).toContain("bookmarks");
       expect(names).toContain("bookmarks_fts");
       expect(names).toContain("user");
+      expect(names).toContain(MIGRATIONS_TABLE);
+      // 0003 is a non-idempotent `ALTER TABLE ... ADD COLUMN`.
+      expect(columnNames(db, "imports")).toContain("error");
+      expect(countRows(db, MIGRATIONS_TABLE)).toBe(MIGRATION_FILES.length);
+
+      db.exec(`
+        INSERT INTO \`user\` (\`id\`,\`name\`,\`email\`,\`email_verified\`,\`created_at\`,\`updated_at\`)
+        VALUES ('u1','Ada','ada@example.com',0,1,1);
+        INSERT INTO \`apikey\` (\`id\`,\`key\`,\`reference_id\`) VALUES ('k1','secret','u1');
+      `);
+      const apiKeysBefore = countRows(db, "apikey");
+      expect(apiKeysBefore).toBe(1);
+
+      // Second run must skip everything already recorded. Without the
+      // __migrations guard, 0003 would throw "duplicate column name: error".
+      await runMigrations(executor);
+
+      expect(countRows(db, "apikey")).toBe(apiKeysBefore);
+      expect(countRows(db, MIGRATIONS_TABLE)).toBe(MIGRATION_FILES.length);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("applies only the migrations that are not recorded yet", async () => {
+    const db = new Database(":memory:");
+    try {
+      const executor = createExecutor(db);
+
+      await runMigrations(executor, MIGRATIONS.slice(0, 1));
+      expect(countRows(db, MIGRATIONS_TABLE)).toBe(1);
+      expect(tableNames(db)).not.toContain("bookmarks_fts");
+
+      await runMigrations(executor);
+
+      expect(countRows(db, MIGRATIONS_TABLE)).toBe(MIGRATION_FILES.length);
+      expect(tableNames(db)).toContain("bookmarks_fts");
+      expect(columnNames(db, "imports")).toContain("error");
     } finally {
       db.close();
     }

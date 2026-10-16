@@ -23,6 +23,22 @@ describe("slugifyTag", () => {
   it("is stable for already-slug input", () => {
     expect(slugifyTag("dev/react")).toBe("dev/react");
   });
+
+  it("falls back to a stable, non-empty slug for non-Latin names", () => {
+    const slug = slugifyTag("\u6771\u4EAC"); // 東京
+    expect(slug).not.toBe("");
+    expect(slug).toBe(encodeURIComponent("\u6771\u4EAC"));
+    expect(slugifyTag("\u6771\u4EAC")).toBe(slug);
+    expect(slugifyTag("\u5927\u962A")).not.toBe(slug); // 大阪
+  });
+
+  it("keeps hierarchy when a segment is non-Latin", () => {
+    expect(slugifyTag("Dev / \u6771\u4EAC")).toBe(`dev/${encodeURIComponent("\u6771\u4EAC")}`);
+  });
+
+  it("still collapses a separator-only name to an empty slug", () => {
+    expect(slugifyTag(" / ")).toBe("");
+  });
 });
 
 describe("isHierarchicalTag", () => {

@@ -1,6 +1,6 @@
 import { pageSchema } from "@bookmarks/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiRequest } from "./api";
+import { ApiError, api, apiRequest } from "./api";
 
 const fetchMock = vi.fn();
 
@@ -146,5 +146,48 @@ describe("apiRequest", () => {
 
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toBe("/api/bookmarks?tag=dev&tag=react&sort=title");
+  });
+});
+
+describe("api.imports", () => {
+  const base = {
+    id: "i1",
+    source: "html",
+    total: 0,
+    imported: 0,
+    skipped: 0,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("parses a failed import and its reason", async () => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        items: [
+          {
+            ...base,
+            status: "failed",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+            error: "d1 write failed",
+          },
+        ],
+      }),
+    );
+
+    const [item] = await api.imports.list();
+
+    expect(item?.status).toBe("failed");
+    expect(item?.error).toBe("d1 write failed");
+  });
+
+  it("treats an absent error field as null", async () => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValue(
+      jsonResponse({ items: [{ ...base, status: "running", finishedAt: null }] }),
+    );
+
+    const [item] = await api.imports.list();
+
+    expect(item?.error).toBeNull();
   });
 });

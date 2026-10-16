@@ -1,3 +1,4 @@
+import { MAX_AI_RESPONSE_BYTES } from "@bookmarks/shared";
 import { describe, expect, it } from "vitest";
 import { AiProviderError } from "./errors.js";
 import { createProvider } from "./index.js";
@@ -259,5 +260,36 @@ describe("createProvider", () => {
     await provider.suggestTags(ONE_BOOKMARK, []);
 
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("createOpenAiCompatibleProvider response cap", () => {
+  it("rejects a body larger than the cap instead of buffering it", async () => {
+    const huge = "x".repeat(MAX_AI_RESPONSE_BYTES + 1024);
+    const { fetchImpl } = createFakeFetch(
+      () => new Response(huge, { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    const provider = createOpenAiCompatibleProvider({ apiKey: "k", model: "m", fetchImpl });
+
+    await expect(provider.suggestTags(ONE_BOOKMARK, [])).rejects.toMatchObject({
+      name: "AiProviderError",
+    });
+  });
+
+  it("rejects an oversized stub body when the response has no stream", async () => {
+    const huge = "x".repeat(MAX_AI_RESPONSE_BYTES + 1024);
+    const stub = {
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      body: null,
+      text: async () => huge,
+    } as unknown as Response;
+    const { fetchImpl } = createFakeFetch(() => stub);
+    const provider = createOpenAiCompatibleProvider({ apiKey: "k", model: "m", fetchImpl });
+
+    await expect(provider.suggestTags(ONE_BOOKMARK, [])).rejects.toMatchObject({
+      name: "AiProviderError",
+    });
   });
 });

@@ -23,7 +23,12 @@ export interface ImportSummary {
   skipped: number;
   createdAt: string;
   finishedAt: string | null;
+  /** Failure reason when `status` is `failed`; `null` otherwise. */
+  error: string | null;
 }
+
+/** Upper bound on the failure reason persisted on an `imports` row. */
+const MAX_IMPORT_ERROR_LENGTH = 500;
 
 function toSummary(row: typeof imports.$inferSelect): ImportSummary {
   return {
@@ -35,7 +40,29 @@ function toSummary(row: typeof imports.$inferSelect): ImportSummary {
     skipped: row.skipped,
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+    error: row.error,
   };
+}
+
+/**
+ * Record a failed run so the row does not stay `running` forever. Best effort:
+ * the original error is more useful than a failed bookkeeping write, so a
+ * problem here is swallowed.
+ */
+async function markImportFailed(db: Database, id: string, error: unknown): Promise<void> {
+  const reason = error instanceof Error ? error.message : String(error);
+  try {
+    await db
+      .update(imports)
+      .set({
+        status: "failed",
+        error: reason.slice(0, MAX_IMPORT_ERROR_LENGTH),
+        finishedAt: new Date(),
+      })
+      .where(eq(imports.id, id));
+  } catch {
+    // Ignore: the caller still receives the original error.
+  }
 }
 
 function toItems(input: CreateImportInput): BulkBookmarkItem[] {
@@ -60,6 +87,9 @@ function toItems(input: CreateImportInput): BulkBookmarkItem[] {
 /**
  * Run an import synchronously: parse, bulk-insert with per-user dedupe, record
  * the outcome, and optionally enqueue AI tagging for the new bookmarks.
+ *
+ * A failure after the row is created marks it `failed` (with the reason and
+ * `finishedAt`) before propagating, so it never stays `running` forever.
  */
 export async function runImport(
   env: Env,
@@ -88,33 +118,39 @@ export async function runImport(
   let skipped = 0;
   const bookmarkIds: string[] = [];
 
-  for (const part of chunk(items, IMPORT_BATCH_SIZE)) {
-    const result = await bulkCreateBookmarks(db, userId, { source: "import", items: part });
-    imported += result.imported;
-    skipped += result.skipped;
-    bookmarkIds.push(...result.bookmarkIds);
+  try {
+    for (const part of chunk(items, IMPORT_BATCH_SIZE)) {
+      const result = await bulkCreateBookmarks(db, userId, { source: "import", items: part });
+      imported += result.imported;
+      skipped += result.skipped;
+      bookmarkIds.push(...result.bookmarkIds);
+    }
+
+    const finishedAt = new Date();
+    await db
+      .update(imports)
+      .set({ status: "done", total: items.length, imported, skipped, finishedAt })
+      .where(eq(imports.id, id));
+
+    if (input.autoTag && bookmarkIds.length > 0) {
+      await createAiJob(env, db, userId, "tag_bookmarks", { bookmarkIds });
+    }
+
+    return {
+      id,
+      source: input.source,
+      status: "done",
+      total: items.length,
+      imported,
+      skipped,
+      createdAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      error: null,
+    };
+  } catch (error) {
+    await markImportFailed(db, id, error);
+    throw error;
   }
-
-  const finishedAt = new Date();
-  await db
-    .update(imports)
-    .set({ status: "done", total: items.length, imported, skipped, finishedAt })
-    .where(eq(imports.id, id));
-
-  if (input.autoTag && bookmarkIds.length > 0) {
-    await createAiJob(env, db, userId, "tag_bookmarks", { bookmarkIds });
-  }
-
-  return {
-    id,
-    source: input.source,
-    status: "done",
-    total: items.length,
-    imported,
-    skipped,
-    createdAt: startedAt.toISOString(),
-    finishedAt: finishedAt.toISOString(),
-  };
 }
 
 /** Recent imports for a user, newest first. */

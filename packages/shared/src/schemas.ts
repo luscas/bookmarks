@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_TAGS_PER_BOOKMARK } from "./constants.js";
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_FOLDER_PATH_DEPTH,
+  MAX_FOLDER_SEGMENT_LENGTH,
+  MAX_IMPORT_ITEMS,
+  MAX_PAGE_SIZE,
+  MAX_TAGS_PER_BOOKMARK,
+  MAX_URL_LENGTH,
+} from "./constants.js";
 
 /* ------------------------------------------------------------------ enums */
 
@@ -31,7 +39,7 @@ export type AiJobStatus = z.infer<typeof aiJobStatusEnum>;
 /* -------------------------------------------------------------- bookmarks */
 
 export const createBookmarkSchema = z.object({
-  url: z.string().trim().min(1, "url is required"),
+  url: z.string().trim().min(1, "url is required").max(MAX_URL_LENGTH),
   title: z.string().trim().max(500).optional(),
   description: z.string().trim().max(2000).optional(),
   notes: z.string().trim().max(5000).optional(),
@@ -40,12 +48,15 @@ export const createBookmarkSchema = z.object({
 export type CreateBookmarkInput = z.infer<typeof createBookmarkSchema>;
 
 export const bulkBookmarkItemSchema = z.object({
-  url: z.string().trim().min(1),
+  url: z.string().trim().min(1).max(MAX_URL_LENGTH),
   title: z.string().trim().max(500).optional(),
   /** Folder path from the browser, e.g. ["Bookmarks Bar", "Dev", "React"]. */
-  folderPath: z.array(z.string()).optional(),
+  folderPath: z
+    .array(z.string().max(MAX_FOLDER_SEGMENT_LENGTH))
+    .max(MAX_FOLDER_PATH_DEPTH)
+    .optional(),
   /** When set, skip these folders becoming tags. */
-  addedAt: z.string().optional(),
+  addedAt: z.string().max(64).optional(),
 });
 export type BulkBookmarkItem = z.infer<typeof bulkBookmarkItemSchema>;
 
@@ -117,7 +128,7 @@ export type MergeTagsInput = z.infer<typeof mergeTagsSchema>;
 export const createImportSchema = z
   .object({
     source: importSourceEnum,
-    items: z.array(bulkBookmarkItemSchema).optional(),
+    items: z.array(bulkBookmarkItemSchema).max(MAX_IMPORT_ITEMS).optional(),
     html: z.string().optional(),
     /** Enqueue AI tagging for everything the import creates. */
     autoTag: z.boolean().default(false),

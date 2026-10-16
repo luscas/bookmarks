@@ -8,6 +8,20 @@
       "when": 1792119337051,
       "tag": "0000_dusty_meggan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792124850205,
+      "tag": "0002_api_key_rate_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792125553109,
+      "tag": "0003_import_error",
+      "breakpoints": true
     }
   ]
 }

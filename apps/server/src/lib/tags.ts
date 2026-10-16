@@ -1,9 +1,10 @@
 import type { TagRow } from "@bookmarks/db";
-import { type Database, bookmarkTags, tags } from "@bookmarks/db";
+import { type Database, bookmarkTags, bookmarks, ownedBookmarkIds, tags } from "@bookmarks/db";
 import type { Tag, TagKind, TagSource, UpdateTagInput } from "@bookmarks/shared";
 import { normalizeTagName, slugifyTag } from "@bookmarks/shared";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { chunk } from "./chunk.js";
+import { isUniqueViolation } from "./db-errors.js";
 import { badRequest, conflict } from "./http.js";
 import { newId } from "./ids.js";
 import { toTag } from "./mappers.js";
@@ -104,7 +105,16 @@ export async function createTag(
     kind: "manual",
     createdAt: new Date(),
   };
-  await db.insert(tags).values(row);
+  try {
+    await db.insert(tags).values(row);
+  } catch (error) {
+    // A concurrent request may have created the same slug; report it as a 409
+    // instead of leaking a UNIQUE-constraint 500.
+    if (isUniqueViolation(error)) {
+      throw conflict(`Tag "${resolved.name}" already exists`);
+    }
+    throw error;
+  }
   return row;
 }
 
@@ -146,10 +156,17 @@ export async function updateTag(
   }
 
   if (Object.keys(patch).length > 0) {
-    await db
-      .update(tags)
-      .set(patch)
-      .where(and(eq(tags.userId, userId), eq(tags.id, id)));
+    try {
+      await db
+        .update(tags)
+        .set(patch)
+        .where(and(eq(tags.userId, userId), eq(tags.id, id)));
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw conflict(`Tag "${patch.name ?? existing.name}" already exists`);
+      }
+      throw error;
+    }
   }
   return { ...existing, ...patch };
 }
@@ -218,7 +235,16 @@ export async function setBookmarkTags(
   bookmarkId: string,
   names: readonly string[],
 ): Promise<TagRow[]> {
-  await db.delete(bookmarkTags).where(eq(bookmarkTags.bookmarkId, bookmarkId));
+  // Scope the delete to a bookmark the caller owns so this can never touch
+  // another user's links, even if a caller forgets the ownership check.
+  await db
+    .delete(bookmarkTags)
+    .where(
+      and(
+        eq(bookmarkTags.bookmarkId, bookmarkId),
+        inArray(bookmarkTags.bookmarkId, ownedBookmarkIds(bookmarks.id, userId)),
+      ),
+    );
   return attachTags(db, userId, [{ bookmarkId, names }], "manual", "manual");
 }
 
@@ -344,9 +370,18 @@ export async function mergeTags(
     await db.run(
       sql`insert or ignore into bookmark_tags (bookmark_id, tag_id, source, confidence)
           select bookmark_id, ${targetTagId}, source, confidence
-          from bookmark_tags where tag_id = ${sourceId}`,
+          from bookmark_tags
+          where tag_id = ${sourceId}
+            and bookmark_id in ${ownedBookmarkIds(sql`bookmarks.id`, userId)}`,
     );
-    await db.delete(bookmarkTags).where(eq(bookmarkTags.tagId, sourceId));
+    await db
+      .delete(bookmarkTags)
+      .where(
+        and(
+          eq(bookmarkTags.tagId, sourceId),
+          inArray(bookmarkTags.bookmarkId, ownedBookmarkIds(bookmarks.id, userId)),
+        ),
+      );
   }
 
   if (sources.length > 0) {

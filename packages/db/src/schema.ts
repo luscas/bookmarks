@@ -7,6 +7,7 @@ import type {
   TagKind,
   TagSource,
 } from "@bookmarks/shared";
+import { API_KEY_RATE_LIMIT_MAX, API_KEY_RATE_LIMIT_WINDOW_MS } from "@bookmarks/shared";
 import { sql } from "drizzle-orm";
 import {
   index,
@@ -120,8 +121,8 @@ export const apikey = sqliteTable(
     lastRefillAt: integer("last_refill_at", { mode: "timestamp_ms" }),
     enabled: integer("enabled", { mode: "boolean" }).default(true),
     rateLimitEnabled: integer("rate_limit_enabled", { mode: "boolean" }).default(true),
-    rateLimitTimeWindow: integer("rate_limit_time_window").default(86_400_000),
-    rateLimitMax: integer("rate_limit_max").default(10),
+    rateLimitTimeWindow: integer("rate_limit_time_window").default(API_KEY_RATE_LIMIT_WINDOW_MS),
+    rateLimitMax: integer("rate_limit_max").default(API_KEY_RATE_LIMIT_MAX),
     requestCount: integer("request_count").default(0),
     remaining: integer("remaining"),
     lastRequest: integer("last_request", { mode: "timestamp_ms" }),
@@ -208,6 +209,8 @@ export const imports = sqliteTable("imports", {
     .references(() => user.id, { onDelete: "cascade" }),
   source: text("source").$type<ImportSource>().notNull(),
   status: text("status").notNull(),
+  /** Failure reason when `status` is `failed`; `null` otherwise. */
+  error: text("error"),
   total: integer("total").notNull().default(0),
   imported: integer("imported").notNull().default(0),
   skipped: integer("skipped").notNull().default(0),

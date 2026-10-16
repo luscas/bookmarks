@@ -1,22 +1,24 @@
 /**
  * Migration bookkeeping and runtime application.
  *
- * Drizzle-kit owns the baseline SQL in `migrations/`. FTS5 lives in its own
- * numbered file (`0001_fts5.sql`) because Drizzle has no concept of virtual
- * tables. A Cloudflare Worker cannot read files from disk, so the SQL is also
- * embedded here and applied by {@link runMigrations}. `migrations.test.ts`
- * asserts the embedded strings stay in sync with the files on disk.
+ * Drizzle-kit owns the SQL in `migrations/`; FTS5 lives in its own hand-written
+ * file (`0001_fts5.sql`) because Drizzle has no concept of virtual tables. A
+ * Cloudflare Worker cannot read files from disk, so the SQL is embedded here and
+ * applied by {@link runMigrations}. `migrations.test.ts` asserts that the
+ * embedded strings stay in sync with the files on disk and that every `.sql`
+ * file in the directory is accounted for.
  *
- * The `.sql` files are always driven forward by `drizzle-kit generate`; the base
- * file name below must be updated when a new baseline is generated. Note that a
- * future `drizzle-kit generate` will pick the next numeric prefix (0001) and can
- * collide with the hand-written FTS migration; renumber that baseline if so.
+ * `drizzle-kit generate` numbers new files from the journal's last `idx`, so a
+ * generated file can collide with a hand-written one; renumber the generated
+ * file (and its `_journal.json` tag) when that happens.
  *
- * D1 has no multi-statement transaction, so `runMigrations` applies statements
- * sequentially. Statements are rewritten to `CREATE ... IF NOT EXISTS`, which
- * makes applying an already-applied migration a no-op. `ALTER TABLE` is the one
- * exception (SQLite does not support `ADD COLUMN IF NOT EXISTS`); migrations
- * using it must be guarded by the caller.
+ * `runMigrations` records each applied migration in the `__migrations` control
+ * table and skips anything already recorded, so non-idempotent migrations
+ * (`ALTER TABLE`, table rebuilds) run exactly once. Statements are still
+ * rewritten to `CREATE ... IF NOT EXISTS` as a resume aid after a partial
+ * failure. D1 has no multi-statement transaction, so a failure mid-migration
+ * leaves earlier statements applied and the migration *unrecorded*; the next run
+ * resumes it from the top. Errors propagate.
  */
 
 export interface Migration {
@@ -28,6 +30,9 @@ export interface Migration {
 
 /** Statement separator emitted by drizzle-kit. */
 export const MIGRATION_BREAKPOINT = "--> statement-breakpoint";
+
+/** Control table recording which migrations have already been applied. */
+export const MIGRATIONS_TABLE = "__migrations";
 
 /**
  * Ordered migrations. Order is significant: the baseline creates the tables the
@@ -227,14 +232,64 @@ END;
 --> statement-breakpoint
 INSERT INTO \`bookmarks_fts\`(\`bookmarks_fts\`) VALUES ('rebuild');`,
   },
+  {
+    name: "0002_api_key_rate_limit.sql",
+    sql: `PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE \`__new_apikey\` (
+	\`id\` text PRIMARY KEY NOT NULL,
+	\`config_id\` text DEFAULT 'default' NOT NULL,
+	\`name\` text,
+	\`start\` text,
+	\`prefix\` text,
+	\`key\` text NOT NULL,
+	\`reference_id\` text NOT NULL,
+	\`refill_interval\` integer,
+	\`refill_amount\` integer,
+	\`last_refill_at\` integer,
+	\`enabled\` integer DEFAULT true,
+	\`rate_limit_enabled\` integer DEFAULT true,
+	\`rate_limit_time_window\` integer DEFAULT 3600000,
+	\`rate_limit_max\` integer DEFAULT 5000,
+	\`request_count\` integer DEFAULT 0,
+	\`remaining\` integer,
+	\`last_request\` integer,
+	\`expires_at\` integer,
+	\`created_at\` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	\`updated_at\` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	\`permissions\` text,
+	\`metadata\` text,
+	FOREIGN KEY (\`reference_id\`) REFERENCES \`user\`(\`id\`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+INSERT INTO \`__new_apikey\`("id", "config_id", "name", "start", "prefix", "key", "reference_id", "refill_interval", "refill_amount", "last_refill_at", "enabled", "rate_limit_enabled", "rate_limit_time_window", "rate_limit_max", "request_count", "remaining", "last_request", "expires_at", "created_at", "updated_at", "permissions", "metadata") SELECT "id", "config_id", "name", "start", "prefix", "key", "reference_id", "refill_interval", "refill_amount", "last_refill_at", "enabled", "rate_limit_enabled", "rate_limit_time_window", "rate_limit_max", "request_count", "remaining", "last_request", "expires_at", "created_at", "updated_at", "permissions", "metadata" FROM \`apikey\`;--> statement-breakpoint
+DROP TABLE \`apikey\`;--> statement-breakpoint
+ALTER TABLE \`__new_apikey\` RENAME TO \`apikey\`;--> statement-breakpoint
+PRAGMA foreign_keys=ON;--> statement-breakpoint
+CREATE UNIQUE INDEX \`apikey_key_unique\` ON \`apikey\` (\`key\`);--> statement-breakpoint
+CREATE INDEX \`apikey_reference_id_idx\` ON \`apikey\` (\`reference_id\`);--> statement-breakpoint
+CREATE INDEX \`apikey_config_id_idx\` ON \`apikey\` (\`config_id\`);`,
+  },
+  {
+    name: "0003_import_error.sql",
+    sql: "ALTER TABLE `imports` ADD `error` text;",
+  },
 ];
 
 /** Ordered migration file names, for verifying that every file is accounted for. */
 export const MIGRATION_FILES: readonly string[] = MIGRATIONS.map((migration) => migration.name);
 
-/** Minimal surface `runMigrations` needs; satisfied by D1 and better-sqlite3. */
+/**
+ * Minimal surface `runMigrations` needs. Both Cloudflare D1 and better-sqlite3
+ * satisfy it with a thin adapter:
+ *
+ *   D1:      { exec: (sql) => db.exec(sql), all: (sql) => db.prepare(sql).all().results }
+ *   sqlite3: { exec: (sql) => db.exec(sql), all: (sql) => db.prepare(sql).all() }
+ */
 export interface MigrationExecutor {
+  /** Execute a single raw statement. */
   exec(sql: string): unknown;
+  /** Run a single read-only statement and return its rows. */
+  all(sql: string): unknown[] | Promise<unknown[]>;
 }
 
 /** Split a migration file into individual executable statements. */
@@ -254,8 +309,10 @@ const CREATE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 
 /**
- * Rewrite a `CREATE` statement to its `IF NOT EXISTS` form so migrations can be
- * applied more than once. Non-`CREATE` statements are returned unchanged.
+ * Rewrite a `CREATE` statement to its `IF NOT EXISTS` form. This is only a
+ * resume aid for a partially applied migration: exactly-once application is
+ * guaranteed by the `__migrations` control table, not by this rewriting.
+ * Non-`CREATE` statements are returned unchanged.
  */
 export function makeIdempotent(statement: string): string {
   let result = statement;
@@ -265,18 +322,48 @@ export function makeIdempotent(statement: string): string {
   return result;
 }
 
+/** Quote a value as a SQL string literal. Names come from this module, not users. */
+function sqlLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** Names recorded in `__migrations`, created on demand by {@link runMigrations}. */
+export async function appliedMigrations(executor: MigrationExecutor): Promise<Set<string>> {
+  const rows = await executor.all(`SELECT \`name\` FROM \`${MIGRATIONS_TABLE}\`;`);
+  const applied = new Set<string>();
+  for (const row of rows) {
+    const name = (row as { name?: unknown } | null)?.name;
+    if (typeof name === "string") {
+      applied.add(name);
+    }
+  }
+  return applied;
+}
+
 /**
- * Apply every migration in order. Safe to call repeatedly for `CREATE`-only
- * migrations. Errors propagate; D1 has no cross-statement transaction, so a
- * failure leaves already-applied statements in place.
+ * Apply every migration exactly once, in order, recording each name in
+ * `__migrations`. The control table is what makes non-idempotent migrations
+ * (table rebuilds, `ALTER TABLE`) safe to re-run; an already-recorded migration
+ * is skipped entirely. Errors propagate.
  */
 export async function runMigrations(
   executor: MigrationExecutor,
   migrations: readonly Migration[] = MIGRATIONS,
 ): Promise<void> {
+  await executor.exec(
+    `CREATE TABLE IF NOT EXISTS \`${MIGRATIONS_TABLE}\` (\`name\` text PRIMARY KEY NOT NULL, \`applied_at\` integer NOT NULL);`,
+  );
+
+  const applied = await appliedMigrations(executor);
   for (const migration of migrations) {
+    if (applied.has(migration.name)) {
+      continue;
+    }
     for (const statement of splitStatements(migration.sql)) {
       await executor.exec(makeIdempotent(statement));
     }
+    await executor.exec(
+      `INSERT INTO \`${MIGRATIONS_TABLE}\` (\`name\`, \`applied_at\`) VALUES (${sqlLiteral(migration.name)}, ${Date.now()});`,
+    );
   }
 }

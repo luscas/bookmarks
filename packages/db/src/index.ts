@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import * as schema from "./schema.js";
 
 export * from "./migrations.js";
+export * from "./owned-scope.js";
 export * from "./schema.js";
 
 /** Drizzle client bound to a D1 database, used across the server. */

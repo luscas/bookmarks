@@ -9,6 +9,7 @@ import type {
 import { folderPathToTagName, hostnameOf, normalizeUrl, urlHash } from "@bookmarks/shared";
 import { and, eq, inArray } from "drizzle-orm";
 import { chunk } from "./chunk.js";
+import { isUniqueViolation } from "./db-errors.js";
 import { badRequest } from "./http.js";
 import { newId } from "./ids.js";
 import { attachTags, setBookmarkTags, tagsForBookmarks } from "./tags.js";
@@ -33,6 +34,15 @@ export interface SelectBookmarksOptions {
   bookmarkIds?: readonly string[];
   scope?: "all" | "untagged";
   limit?: number;
+}
+
+/**
+ * Split bookmark ids so each `IN (...)` stays within D1's 100-parameter limit.
+ * `aiTagRequestSchema` accepts up to 1000 ids, so callers must not pass them all
+ * to a single statement.
+ */
+export function bookmarkIdBatches(ids: readonly string[]): string[][] {
+  return chunk(ids, IDS_PER_QUERY);
 }
 
 /** Load a single bookmark owned by `userId`, or `null`. */
@@ -107,7 +117,23 @@ export async function createBookmark(
     createdAt: now,
     updatedAt: now,
   };
-  await db.insert(bookmarks).values(row);
+  try {
+    await db.insert(bookmarks).values(row);
+  } catch (error) {
+    // A concurrent request may have inserted the same URL between our select and
+    // insert; surface it as the existing bookmark instead of a 500.
+    if (isUniqueViolation(error)) {
+      const raced = await db
+        .select()
+        .from(bookmarks)
+        .where(and(eq(bookmarks.userId, userId), eq(bookmarks.urlHash, hash)))
+        .get();
+      if (raced) {
+        return { bookmark: raced, created: false };
+      }
+    }
+    throw error;
+  }
 
   if (input.tags && input.tags.length > 0) {
     await setBookmarkTags(db, userId, row.id, input.tags);
@@ -207,24 +233,43 @@ export async function bulkCreateBookmarks(
   return { imported: rows.length, skipped, bookmarkIds: rows.map((row) => row.id) };
 }
 
+async function selectBookmarksByIds(
+  db: Database,
+  userId: string,
+  ids: readonly string[],
+): Promise<BookmarkRow[]> {
+  const rows: BookmarkRow[] = [];
+  for (const part of bookmarkIdBatches(ids)) {
+    if (part.length === 0) {
+      continue;
+    }
+    const found = await db
+      .select()
+      .from(bookmarks)
+      .where(and(eq(bookmarks.userId, userId), inArray(bookmarks.id, part)));
+    rows.push(...found);
+  }
+  return rows;
+}
+
 /** Select bookmarks for AI jobs and bulk operations. */
 export async function selectBookmarks(
   db: Database,
   options: SelectBookmarksOptions,
 ): Promise<BookmarkRow[]> {
-  const conditions = [eq(bookmarks.userId, options.userId)];
+  let rows: BookmarkRow[];
   if (options.bookmarkIds) {
     if (options.bookmarkIds.length === 0) {
       return [];
     }
-    conditions.push(inArray(bookmarks.id, [...options.bookmarkIds]));
+    rows = await selectBookmarksByIds(db, options.userId, options.bookmarkIds);
+    if (options.limit !== undefined) {
+      rows = rows.slice(0, options.limit);
+    }
+  } else {
+    const base = db.select().from(bookmarks).where(eq(bookmarks.userId, options.userId));
+    rows = options.limit !== undefined ? await base.limit(options.limit) : await base;
   }
-
-  const base = db
-    .select()
-    .from(bookmarks)
-    .where(and(...conditions));
-  const rows = options.limit !== undefined ? await base.limit(options.limit) : await base;
 
   if (options.scope === "untagged") {
     const tagged = await tagsForBookmarks(

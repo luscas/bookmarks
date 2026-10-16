@@ -17,4 +17,10 @@ describe("buildFtsQuery", () => {
   it("returns an empty string when nothing is usable", () => {
     expect(buildFtsQuery("   ")).toBe("");
   });
+
+  it("strips NUL and other control characters that break FTS5 MATCH", () => {
+    expect(buildFtsQuery("hello\u0000world")).toBe('"hello" "world"');
+    expect(buildFtsQuery("\u0000")).toBe("");
+    expect(buildFtsQuery("a\u0007b\u001fc")).toBe('"a" "b" "c"');
+  });
 });

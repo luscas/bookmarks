@@ -34,4 +34,4 @@ The Worker needs local secrets — copy `.dev.vars.example` to `.dev.vars` and f
 pnpm --filter @bookmarks/server deploy
 ```
 
-See `docs/superpowers/specs/` for the design spec.
+See `docs/specs/` for the design spec.
