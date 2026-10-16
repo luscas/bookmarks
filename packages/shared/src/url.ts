@@ -51,14 +51,46 @@ function isTracking(key: string): boolean {
 
 const SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
 
+/** Any `scheme:` prefix, including opaque forms like `javascript:alert(1)`. */
+const ANY_SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+
+/**
+ * ASCII control characters (C0 controls plus DEL) that the WHATWG URL parser
+ * silently strips. A tab inside `java\tscript://…` is how the scheme smuggles
+ * past a naive `startsWith`/scheme check, so they are removed before parsing.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping these exact characters is the security fix
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/g;
+
+/**
+ * Schemes that execute or inline content when a browser renders them in an
+ * `href`. They are rejected outright, before any `https://` fallback could
+ * disguise them. Other non-http(s) schemes either fail to parse as an https
+ * URL (opaque payloads make invalid ports/hosts) or normalize into an inert
+ * https navigation, which the final protocol check already rejects.
+ */
+const EXECUTABLE_SCHEMES = new Set(["javascript", "data", "vbscript"]);
+
 /**
  * Normalize a URL into its canonical, dedupe-stable form.
  * Throws when the input cannot be parsed as a URL.
  */
 export function normalizeUrl(input: string): string {
-  const raw = input.trim();
+  // Strip control characters first so the parser below and every check on this
+  // string see exactly the characters a browser would see.
+  const raw = input.replace(CONTROL_CHARS, "").trim();
   if (raw.length === 0) {
     throw new Error("Cannot normalize an empty URL");
+  }
+
+  // After stripping, a smuggled `javascript:`/`data:` prefix is visible as a
+  // real scheme; reject it before the https fallback can mask it.
+  const schemeMatch = raw.match(ANY_SCHEME_RE);
+  if (schemeMatch) {
+    const scheme = schemeMatch[0].slice(0, -1).toLowerCase();
+    if (EXECUTABLE_SCHEMES.has(scheme)) {
+      throw new Error(`Unsupported URL scheme: ${scheme}:`);
+    }
   }
 
   const withScheme = SCHEME_RE.test(raw) ? raw : `https://${raw}`;

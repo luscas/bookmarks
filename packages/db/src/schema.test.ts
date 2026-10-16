@@ -157,3 +157,36 @@ describe("bookmarks schema", () => {
     ).not.toThrow();
   });
 });
+
+describe("rate_limits schema", () => {
+  it("is created by the migrations and enforces one row per key", () => {
+    const db = new Database(":memory:");
+    try {
+      const files = readdirSync(migrationsDir)
+        .filter((name) => name.endsWith(".sql"))
+        .sort();
+      for (const file of files) {
+        const sql = readFileSync(join(migrationsDir, file), "utf8");
+        for (const statement of splitStatements(sql)) {
+          db.exec(statement);
+        }
+      }
+
+      const insert = db.prepare(
+        'INSERT INTO "rate_limits" ("key", "count", "window_start") VALUES (?, ?, ?)',
+      );
+      insert.run("signin:203.0.113.9", 1, 1000);
+      // The primary key on `key` is what makes the compare-and-swap limiter
+      // race-safe: exactly one concurrent request can own a given counter.
+      expect(() => insert.run("signin:203.0.113.9", 2, 2000)).toThrow(/UNIQUE/i);
+      expect(() => insert.run("favicon:203.0.113.9", 1, 1000)).not.toThrow();
+
+      const rows = db.prepare('SELECT "key" FROM "rate_limits" ORDER BY "key"').all() as Array<{
+        key: string;
+      }>;
+      expect(rows.map((row) => row.key)).toEqual(["favicon:203.0.113.9", "signin:203.0.113.9"]);
+    } finally {
+      db.close();
+    }
+  });
+});

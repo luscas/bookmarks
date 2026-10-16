@@ -37,6 +37,62 @@ describe("normalizeUrl", () => {
     expect(() => normalizeUrl("ftp://example.com")).toThrow();
   });
 
+  it("rejects executable schemes written without slashes", () => {
+    expect(() => normalizeUrl("javascript:alert(1)")).toThrow(/Unsupported URL scheme/);
+    expect(() => normalizeUrl("data:text/html,<script>")).toThrow(/Unsupported URL scheme/);
+    expect(() => normalizeUrl("vbscript:msgbox")).toThrow(/Unsupported URL scheme/);
+  });
+
+  describe("scheme smuggling via control characters", () => {
+    // The WHATWG parser strips tabs/newlines/CRs before parsing, so without
+    // the control-char strip these inputs hid a `javascript` scheme behind an
+    // `https://` prefix and were accepted.
+    it("rejects the audit payload with a tab and an encoded newline", () => {
+      expect(() => normalizeUrl("java\tscript://x%0Aalert(1)")).toThrow();
+    });
+
+    it("rejects a tab inside the scheme", () => {
+      expect(() => normalizeUrl("java\tscript://x")).toThrow(/Unsupported URL scheme/);
+    });
+
+    it("rejects a newline inside the scheme", () => {
+      expect(() => normalizeUrl("java\nscript:x")).toThrow();
+    });
+
+    it("rejects a carriage return inside the scheme", () => {
+      expect(() => normalizeUrl("java\rscript:")).toThrow(/Unsupported URL scheme/);
+    });
+
+    it("rejects an uppercase smuggled scheme", () => {
+      expect(() => normalizeUrl("JAVA\tSCRIPT://x")).toThrow(/Unsupported URL scheme/);
+    });
+
+    it("rejects a quoted smuggled scheme (leading space and quote)", () => {
+      expect(() => normalizeUrl('" javascript:alert(1)"')).toThrow();
+    });
+
+    it("never returns a non-http(s) URL, whatever the input", () => {
+      const hostile = [
+        "java\tscript://x%0Aalert(1)",
+        "data:text/html,<script>alert(1)</script>",
+        " \r\n javascript:alert(1)",
+        "\x00https://example.com",
+      ];
+      for (const input of hostile) {
+        try {
+          const normalized = normalizeUrl(input);
+          expect(normalized).toMatch(/^https?:\/\//);
+        } catch {
+          // Rejected outright: equally safe.
+        }
+      }
+    });
+  });
+
+  it("keeps host:port inputs without a scheme working", () => {
+    expect(normalizeUrl("example.com:8080/path")).toBe("https://example.com:8080/path");
+  });
+
   it("throws on empty input", () => {
     expect(() => normalizeUrl("   ")).toThrow();
   });

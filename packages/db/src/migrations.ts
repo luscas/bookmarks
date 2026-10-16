@@ -277,6 +277,10 @@ CREATE INDEX \`apikey_config_id_idx\` ON \`apikey\` (\`config_id\`);`,
     name: "0004_ai_reasoning_effort.sql",
     sql: "ALTER TABLE `ai_settings` ADD COLUMN `reasoning_effort` text;",
   },
+  {
+    name: "0005_rate_limits.sql",
+    sql: "CREATE TABLE `rate_limits` (`key` text PRIMARY KEY NOT NULL, `count` integer NOT NULL, `window_start` integer NOT NULL);",
+  },
 ];
 
 /** Ordered migration file names, for verifying that every file is accounted for. */

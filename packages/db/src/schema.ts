@@ -258,6 +258,21 @@ export const aiJobs = sqliteTable(
   (table) => [index("ai_jobs_user_id_created_at_idx").on(table.userId, table.createdAt)],
 );
 
+/* -------------------------------------------------------------- rate limits */
+
+/**
+ * Fixed-window rate-limit counters, persisted in D1 so every Worker isolate
+ * sees the same counts (an in-memory limiter resets per isolate and lets
+ * distributed brute force through). One row per limiter key, e.g.
+ * `signin:203.0.113.9`; `windowStart` is the epoch-millisecond start of the
+ * current window.
+ */
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  windowStart: integer("window_start").notNull(),
+});
+
 /* ------------------------------------------------------------------ row types */
 
 export type UserRow = typeof user.$inferSelect;
@@ -292,3 +307,6 @@ export type NewAiSettingsRow = typeof aiSettings.$inferInsert;
 
 export type AiJobRow = typeof aiJobs.$inferSelect;
 export type NewAiJobRow = typeof aiJobs.$inferInsert;
+
+export type RateLimitRow = typeof rateLimits.$inferSelect;
+export type NewRateLimitRow = typeof rateLimits.$inferInsert;

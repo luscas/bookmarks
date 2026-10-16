@@ -1,4 +1,4 @@
-import { createImportSchema } from "@bookmarks/shared";
+import { MAX_IMPORT_HTML_BYTES, createImportSchema } from "@bookmarks/shared";
 import { Hono } from "hono";
 import { notFound } from "../lib/http.js";
 import { getImportById, listImports, runImport } from "../lib/imports.js";
@@ -18,7 +18,9 @@ importsRoutes.get("/", async (c) => {
 
 importsRoutes.post("/", async (c) => {
   const user = requireUser(c);
-  const input = await parseJsonBody(c, createImportSchema);
+  // The import envelope legitimately carries up to 10 MiB of HTML, so it opts
+  // out of the default 1 MiB JSON cap explicitly.
+  const input = await parseJsonBody(c, createImportSchema, MAX_IMPORT_HTML_BYTES);
   const summary = await runImport(c.env, c.get("db"), user.id, input);
   return c.json({ import: summary }, 201);
 });

@@ -106,7 +106,11 @@ export async function createBookmark(
   const row: BookmarkRow = {
     id: newId(),
     userId,
-    url: input.url,
+    // Persist the normalized form, never the raw input: the stored value is
+    // what gets rendered into `href`, so it must be the checked http(s) URL.
+    // Dedupe stays keyed on (userId, urlHash) of the same normalized value,
+    // which makes the display column agree with the dedupe key.
+    url: normalized,
     normalizedUrl: normalized,
     urlHash: hash,
     title: input.title ?? null,
@@ -182,7 +186,10 @@ export async function bulkCreateBookmarks(
     const folderName = folderPathToTagName(item.folderPath);
     candidates.push({
       id: newId(),
-      url: item.url,
+      // Same hardening as the single-create path: only the normalized URL is
+      // ever stored, so an import can't smuggle a raw hostile string into the
+      // `url` column that later lands in an `href`.
+      url: normalized,
       normalizedUrl: normalized,
       urlHash: hash,
       title: item.title ?? null,

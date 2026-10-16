@@ -1,5 +1,6 @@
+import { MAX_TAG_NAME_LENGTH } from "@bookmarks/shared";
 import { describe, expect, it } from "vitest";
-import { toProviderConfig } from "../../src/lib/ai-jobs.js";
+import { capAiTagNames, toProviderConfig } from "../../src/lib/ai-jobs.js";
 
 const base = {
   provider: "openai-compatible",
@@ -25,5 +26,25 @@ describe("toProviderConfig", () => {
     const config = toProviderConfig(base, "k");
 
     expect("baseUrl" in config).toBe(false);
+  });
+});
+
+describe("capAiTagNames", () => {
+  it("keeps names within the manual-path cap", () => {
+    expect(capAiTagNames(["react", "web-dev"])).toEqual(["react", "web-dev"]);
+  });
+
+  it("silently drops over-long provider suggestions", () => {
+    const names = ["ok", "x".repeat(MAX_TAG_NAME_LENGTH + 1)];
+
+    expect(capAiTagNames(names)).toEqual(["ok"]);
+  });
+
+  it("accepts a name exactly at the cap", () => {
+    expect(capAiTagNames(["y".repeat(MAX_TAG_NAME_LENGTH)])).toEqual(["y".repeat(100)]);
+  });
+
+  it("drops empty names", () => {
+    expect(capAiTagNames(["", "real"])).toEqual(["real"]);
   });
 });

@@ -19,11 +19,38 @@ export const MAX_PAGE_SIZE = 200;
 /** Max accepted size for an uploaded Netscape bookmarks HTML export (10 MiB). */
 export const MAX_IMPORT_HTML_BYTES = 10 * 1024 * 1024;
 
+/**
+ * Default cap on a parsed JSON request body (1 MiB) enforced before and while
+ * reading, so an oversized payload can never reach `JSON.parse`. The import
+ * route overrides it with `MAX_IMPORT_HTML_BYTES`.
+ */
+export const MAX_JSON_BODY_BYTES = 1024 * 1024;
+
+/**
+ * Cap on `/api/auth/*` request bodies (64 KiB). Auth payloads (credentials,
+ * profile fields) are tiny JSON documents, so anything larger is waste or
+ * abuse; reading the body through this cap keeps oversized payloads from ever
+ * reaching Better Auth's parser.
+ */
+export const MAX_AUTH_BODY_BYTES = 64 * 1024;
+
+/** Max length of a stored tag name (manual path and AI suggestions alike). */
+export const MAX_TAG_NAME_LENGTH = 100;
+
 /** Max number of items accepted in a single import request. */
 export const MAX_IMPORT_ITEMS = 20_000;
 
 /** Max length of a stored URL (generous enough for signed/query-heavy links). */
 export const MAX_URL_LENGTH = 8192;
+
+/** Max length of a search query (`q`) accepted by the list endpoint. */
+export const MAX_SEARCH_QUERY_LENGTH = 200;
+
+/** Max length of an opaque pagination cursor accepted on the list endpoint. */
+export const MAX_CURSOR_LENGTH = 4096;
+
+/** Max length of an AI provider API key accepted by the settings endpoint. */
+export const MAX_AI_API_KEY_LENGTH = 512;
 
 /** Max folder nesting depth accepted from a browser bookmark export. */
 export const MAX_FOLDER_PATH_DEPTH = 32;

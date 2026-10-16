@@ -2,6 +2,7 @@
   "name": "@bookmarks/web",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "rsbuild dev",
@@ -38,6 +39,6 @@
     "jsdom": "^25.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.6"
   }
 }

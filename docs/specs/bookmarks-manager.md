@@ -315,8 +315,8 @@ Convenções:
 três entradas: `popup`, `options` e `background` (service worker, `html: false`,
 `type: module`).
 
-- **Manifesto**: `manifest_version: 3`, permissões `activeTab`, `tabs`,
-  `storage`, `bookmarks`, `contextMenus`; `optional_host_permissions` para
+- **Manifesto**: `manifest_version: 3`, permissões `activeTab`, `storage`,
+  `bookmarks`, `contextMenus`; `optional_host_permissions` para
   `http(s)://*/*` (o usuário concede acesso ao próprio servidor em Options);
   nenhuma URL de servidor fica fixa no manifesto.
 - **Auth por chave de API**: configurações em `chrome.storage.local`

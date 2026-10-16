@@ -1,11 +1,16 @@
 import { z } from "zod";
 import {
   DEFAULT_PAGE_SIZE,
+  MAX_AI_API_KEY_LENGTH,
+  MAX_CURSOR_LENGTH,
   MAX_FOLDER_PATH_DEPTH,
   MAX_FOLDER_SEGMENT_LENGTH,
+  MAX_IMPORT_HTML_BYTES,
   MAX_IMPORT_ITEMS,
   MAX_PAGE_SIZE,
+  MAX_SEARCH_QUERY_LENGTH,
   MAX_TAGS_PER_BOOKMARK,
+  MAX_TAG_NAME_LENGTH,
   MAX_URL_LENGTH,
 } from "./constants.js";
 
@@ -91,13 +96,13 @@ export const bookmarkSortEnum = z.enum(["createdAt", "updatedAt", "title"]);
 export type BookmarkSort = z.infer<typeof bookmarkSortEnum>;
 
 export const listBookmarksQuerySchema = z.object({
-  q: z.string().trim().min(1).optional(),
+  q: z.string().trim().min(1).max(MAX_SEARCH_QUERY_LENGTH).optional(),
   tag: z
     .union([z.string(), z.array(z.string())])
     .transform((value) => (Array.isArray(value) ? value : [value]))
     .optional(),
   sort: bookmarkSortEnum.default("createdAt"),
-  cursor: z.string().optional(),
+  cursor: z.string().max(MAX_CURSOR_LENGTH).optional(),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
 export type ListBookmarksQuery = z.infer<typeof listBookmarksQuerySchema>;
@@ -105,7 +110,7 @@ export type ListBookmarksQuery = z.infer<typeof listBookmarksQuerySchema>;
 /* ------------------------------------------------------------------- tags */
 
 export const createTagSchema = z.object({
-  name: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(MAX_TAG_NAME_LENGTH),
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "color must be a hex value such as #7c3aed")
@@ -115,7 +120,7 @@ export type CreateTagInput = z.infer<typeof createTagSchema>;
 
 export const updateTagSchema = z
   .object({
-    name: z.string().trim().min(1).max(100),
+    name: z.string().trim().min(1).max(MAX_TAG_NAME_LENGTH),
     color: z
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/)
@@ -136,7 +141,13 @@ export const createImportSchema = z
   .object({
     source: importSourceEnum,
     items: z.array(bulkBookmarkItemSchema).max(MAX_IMPORT_ITEMS).optional(),
-    html: z.string().optional(),
+    /**
+     * Cheap pre-filter on the HTML export size. Note this counts UTF-16 code
+     * units, not bytes: a string can pass here and still exceed the byte cap,
+     * so the server re-checks the actual byte length (`htmlByteLength`) —
+     * that check remains the authoritative one.
+     */
+    html: z.string().max(MAX_IMPORT_HTML_BYTES).optional(),
     /**
      * Enqueue AI tagging for everything the import creates. Omit to use the
      * server default (in `NODE_ENV=development` it defaults to `true`, so the
@@ -162,7 +173,7 @@ export const aiSettingsInputSchema = z.object({
    */
   reasoningEffort: aiReasoningEffortEnum.nullish(),
   /** Omit to keep the stored key unchanged. */
-  apiKey: z.string().trim().min(1).optional(),
+  apiKey: z.string().trim().min(1).max(MAX_AI_API_KEY_LENGTH).optional(),
 });
 export type AiSettingsInput = z.infer<typeof aiSettingsInputSchema>;
 

@@ -7,6 +7,7 @@ import {
   resolveFavicon,
 } from "../lib/favicon.js";
 import { badRequest, notFound } from "../lib/http.js";
+import { FAVICON_RATE_LIMIT, ipRateLimit } from "../lib/rate-limit.js";
 import type { AppBindings } from "../middleware/session.js";
 
 const CACHE_CONTROL = "public, max-age=604800, immutable";
@@ -21,6 +22,10 @@ const ICON_HEADERS = {
  * tags work without credentials; keys are hostnames, not user data.
  */
 export const faviconRoutes = new Hono<AppBindings>();
+
+// The proxy endpoint does remote fetches and R2 writes, so it is rate limited
+// per IP (the `/:key` route below only reads cached objects and is not).
+faviconRoutes.use("/", ipRateLimit(FAVICON_RATE_LIMIT));
 
 faviconRoutes.get("/", async (c) => {
   const url = c.req.query("url");

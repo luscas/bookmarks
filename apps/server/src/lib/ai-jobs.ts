@@ -3,7 +3,7 @@ import { createProvider } from "@bookmarks/ai";
 import type { AiJobRow, AiSettingsRow, Database } from "@bookmarks/db";
 import { aiJobs, bookmarks, tags } from "@bookmarks/db";
 import type { AiJobType } from "@bookmarks/shared";
-import { MAX_TAGS_PER_BOOKMARK } from "@bookmarks/shared";
+import { MAX_TAGS_PER_BOOKMARK, MAX_TAG_NAME_LENGTH } from "@bookmarks/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../db.js";
 import type { AiJobMessage, Env } from "../env.js";
@@ -74,6 +74,16 @@ function parseStringArray(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string");
 }
 
+/**
+ * Enforce the manual-path cap (100 chars, see `createTagSchema`) on provider
+ * suggestions: a misconfigured or hostile provider must not be able to write
+ * unbounded tag names. Over-long names are advisory, so they are dropped
+ * silently instead of logging noise on every job.
+ */
+export function capAiTagNames(names: readonly string[]): string[] {
+  return names.filter((name) => name.length > 0 && name.length <= MAX_TAG_NAME_LENGTH);
+}
+
 async function runTagJob(
   db: Database,
   provider: AiProvider,
@@ -95,7 +105,7 @@ async function runTagJob(
     if (!row) {
       continue;
     }
-    const names = suggestion.tags.slice(0, MAX_TAGS_PER_BOOKMARK);
+    const names = capAiTagNames(suggestion.tags).slice(0, MAX_TAGS_PER_BOOKMARK);
     if (names.length > 0) {
       await attachTags(db, userId, [{ bookmarkId: row.id, names }], "ai", "ai");
       tagged += 1;
@@ -131,7 +141,7 @@ async function runOrganizeJob(
     if (!row) {
       continue;
     }
-    const names = assignment.tags.slice(0, MAX_TAGS_PER_BOOKMARK);
+    const names = capAiTagNames(assignment.tags).slice(0, MAX_TAGS_PER_BOOKMARK);
     if (names.length === 0) {
       continue;
     }

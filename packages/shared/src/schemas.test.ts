@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { MAX_FOLDER_PATH_DEPTH, MAX_IMPORT_ITEMS, MAX_URL_LENGTH } from "./constants.js";
+import {
+  MAX_AI_API_KEY_LENGTH,
+  MAX_CURSOR_LENGTH,
+  MAX_FOLDER_PATH_DEPTH,
+  MAX_IMPORT_HTML_BYTES,
+  MAX_IMPORT_ITEMS,
+  MAX_SEARCH_QUERY_LENGTH,
+  MAX_URL_LENGTH,
+} from "./constants.js";
 import {
   aiSettingsInputSchema,
   bulkBookmarkItemSchema,
   bulkBookmarksSchema,
   createImportSchema,
+  listBookmarksQuerySchema,
 } from "./schemas.js";
 
 describe("createImportSchema", () => {
@@ -45,6 +54,48 @@ describe("createImportSchema", () => {
       autoTag: false,
     });
     expect(off.autoTag).toBe(false);
+  });
+
+  it("rejects HTML larger than the import cap (cheap pre-filter)", () => {
+    const result = createImportSchema.safeParse({
+      source: "html",
+      html: "x".repeat(MAX_IMPORT_HTML_BYTES + 1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts HTML exactly at the import cap", () => {
+    const result = createImportSchema.safeParse({
+      source: "html",
+      html: "x".repeat(MAX_IMPORT_HTML_BYTES),
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("listBookmarksQuerySchema length caps", () => {
+  it("rejects an over-long search query", () => {
+    const result = listBookmarksQuerySchema.safeParse({
+      q: "x".repeat(MAX_SEARCH_QUERY_LENGTH + 1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a search query exactly at the cap", () => {
+    const result = listBookmarksQuerySchema.safeParse({ q: "x".repeat(MAX_SEARCH_QUERY_LENGTH) });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an over-long cursor", () => {
+    const result = listBookmarksQuerySchema.safeParse({
+      cursor: "x".repeat(MAX_CURSOR_LENGTH + 1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a cursor exactly at the cap", () => {
+    const result = listBookmarksQuerySchema.safeParse({ cursor: "x".repeat(MAX_CURSOR_LENGTH) });
+    expect(result.success).toBe(true);
   });
 });
 
@@ -101,5 +152,21 @@ describe("aiSettingsInputSchema reasoningEffort", () => {
     expect(aiSettingsInputSchema.safeParse({ ...base, reasoningEffort: "ultra" }).success).toBe(
       false,
     );
+  });
+
+  it("rejects an over-long provider API key", () => {
+    const result = aiSettingsInputSchema.safeParse({
+      ...base,
+      apiKey: "k".repeat(MAX_AI_API_KEY_LENGTH + 1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a provider API key exactly at the cap", () => {
+    const result = aiSettingsInputSchema.safeParse({
+      ...base,
+      apiKey: "k".repeat(MAX_AI_API_KEY_LENGTH),
+    });
+    expect(result.success).toBe(true);
   });
 });

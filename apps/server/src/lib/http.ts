@@ -7,10 +7,15 @@ export interface FieldIssue {
   message: string;
 }
 
-function errorResponse(status: number, message: string, extra?: Record<string, unknown>): Response {
+function errorResponse(
+  status: number,
+  message: string,
+  extra?: Record<string, unknown>,
+  headers?: Record<string, string>,
+): Response {
   return new Response(JSON.stringify({ error: { message, ...extra } }), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
 }
 
@@ -48,4 +53,16 @@ export function conflict(message: string): HTTPException {
 
 export function payloadTooLarge(message: string): HTTPException {
   return apiError(413, message);
+}
+
+/**
+ * A 429 in the standard error shape, carrying the `Retry-After` header (in
+ * seconds) so well-behaved clients know when to come back.
+ */
+export function tooManyRequests(message: string, retryAfterSeconds: number): HTTPException {
+  const status = 429;
+  return new HTTPException(status, {
+    message,
+    res: errorResponse(status, message, undefined, { "retry-after": String(retryAfterSeconds) }),
+  });
 }

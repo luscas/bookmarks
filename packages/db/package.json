@@ -2,6 +2,7 @@
   "name": "@bookmarks/db",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -23,6 +24,6 @@
     "better-sqlite3": "^13.0.3",
     "drizzle-kit": "^0.31.11",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.6"
   }
 }

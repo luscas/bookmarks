@@ -10,19 +10,34 @@ import type { Env } from "./env.js";
 const EXTENSION_ORIGIN_PATTERN = "chrome-extension://*";
 
 /**
+ * Match an origin against trusted patterns: an exact string, or a trailing
+ * `*` acting as a prefix wildcard. Shared by the CORS and CSRF checks.
+ */
+export function isAllowedOrigin(origin: string, patterns: readonly string[]): boolean {
+  return patterns.some((pattern) =>
+    pattern.endsWith("*") ? origin.startsWith(pattern.slice(0, -1)) : pattern === origin,
+  );
+}
+
+/**
  * Parse the comma-separated `TRUSTED_ORIGINS` variable and always include the
  * extension origin pattern so the Chromium MV3 extension can authenticate.
+ * Trailing slashes are stripped at parse time so an operator typo
+ * (`https://app.example.com/`) cannot silently break the SPA.
  */
 export function parseTrustedOrigins(value: string | undefined): string[] {
   const origins = (value ?? "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter((origin) => origin.length > 0);
   if (!origins.includes(EXTENSION_ORIGIN_PATTERN)) {
     origins.push(EXTENSION_ORIGIN_PATTERN);
   }
   return origins;
 }
+
+/** Minimum length of `BETTER_AUTH_SECRET` (mirrors `lib/crypto.ts` strictness). */
+const MIN_SECRET_LENGTH = 32;
 
 /**
  * Build a Better Auth instance for the current request's environment. Plugins:
@@ -38,6 +53,22 @@ export function parseTrustedOrigins(value: string | undefined): string[] {
  * burst (see `API_KEY_RATE_LIMIT_*`, shared with the `apikey` column defaults).
  */
 export function createAuth(env: Env) {
+  // Better Auth only console-warns about weak secrets; without this guard a
+  // missing secret surfaces later as a cryptic `TypeError` from deep inside
+  // the library, so fail fast with an actionable message instead.
+  const secret: string | undefined = env.BETTER_AUTH_SECRET;
+  if (typeof secret !== "string" || secret.length === 0) {
+    throw new Error(
+      "BETTER_AUTH_SECRET is missing or empty. Generate one (e.g. `openssl rand -base64 32`), " +
+        "then set it locally via `just env` (writes apps/server/.dev.vars) or for deploys via " +
+        "`wrangler secret put BETTER_AUTH_SECRET`.",
+    );
+  }
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `BETTER_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters (got ${secret.length})`,
+    );
+  }
   const db = createDb(env.DB);
   return betterAuth({
     database: drizzleAdapter(db, { provider: "sqlite" }),

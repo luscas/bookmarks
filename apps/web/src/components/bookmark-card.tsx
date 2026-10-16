@@ -1,5 +1,5 @@
 import type { Bookmark } from "@bookmarks/shared";
-import { hostnameOf } from "@bookmarks/shared";
+import { hostnameOf, normalizeUrl } from "@bookmarks/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Globe, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -16,6 +16,21 @@ import { useToast } from "./ui/toast";
 interface BookmarkCardProps {
   bookmark: Bookmark;
   suggestions?: readonly string[];
+}
+
+/**
+ * Derive the href through `normalizeUrl` instead of trusting the stored field:
+ * rows written before the server began normalizing at storage time (or a future
+ * client) could still carry a `javascript:`/`data:` payload. When the value
+ * cannot be normalized into a safe http(s) URL, the card renders without a
+ * navigable link rather than linking to the raw value.
+ */
+function safeHref(url: string): string | null {
+  try {
+    return normalizeUrl(url);
+  } catch {
+    return null;
+  }
 }
 
 function Favicon({ url, host }: { url: string | null; host: string }) {
@@ -51,6 +66,7 @@ export function BookmarkCard({ bookmark, suggestions = [] }: BookmarkCardProps) 
 
   const host = hostnameOf(bookmark.url) || bookmark.normalizedUrl;
   const displayTitle = bookmark.title?.trim() || host;
+  const href = safeHref(bookmark.url);
 
   const remove = useMutation({
     mutationFn: () => api.bookmarks.remove(bookmark.id),
@@ -72,15 +88,24 @@ export function BookmarkCard({ bookmark, suggestions = [] }: BookmarkCardProps) 
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex items-baseline gap-2">
           <h3 className="min-w-0 truncate text-sm font-medium">
-            <a
-              href={bookmark.url}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex max-w-full items-center gap-1 rounded-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <span className="truncate">{displayTitle}</span>
-              <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-            </a>
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex max-w-full items-center gap-1 rounded-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <span className="truncate">{displayTitle}</span>
+                <ExternalLink
+                  className="size-3 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </a>
+            ) : (
+              <span className="inline-flex max-w-full items-center gap-1">
+                <span className="truncate">{displayTitle}</span>
+              </span>
+            )}
           </h3>
         </div>
 
