@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "declaration": false,
+    "declarationMap": false,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "rsbuild.config.ts", "vitest.config.ts"]
+}

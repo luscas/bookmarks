@@ -1,0 +1,253 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: the theme toggle puts `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. A restrained neutral ramp carries structure; a single indigo
+ * accent marks the primary action. Colours are authored in oklch so contrast
+ * holds across the light and dark ramps.
+ */
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.994 0.002 264);
+  --foreground: oklch(0.235 0.012 264);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.235 0.012 264);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.235 0.012 264);
+
+  --muted: oklch(0.968 0.004 264);
+  --muted-foreground: oklch(0.5 0.012 264);
+
+  --accent: oklch(0.958 0.007 264);
+  --accent-foreground: oklch(0.29 0.02 264);
+
+  --border: oklch(0.902 0.006 264);
+  --input: oklch(0.892 0.006 264);
+  --ring: oklch(0.55 0.17 268);
+
+  --primary: oklch(0.505 0.176 268);
+  --primary-foreground: oklch(0.99 0.005 268);
+
+  --destructive: oklch(0.577 0.204 25);
+  --destructive-foreground: oklch(0.99 0.005 25);
+
+  --success: oklch(0.62 0.13 158);
+
+  --image-outline: oklch(0 0 0 / 0.1);
+  --shadow-border: 0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.06), 0 2px 4px 0
+    oklch(0 0 0 / 0.04);
+  --shadow-lifted: 0 0 0 1px oklch(0 0 0 / 0.07), 0 6px 16px -6px oklch(0 0 0 / 0.14), 0 2px 6px
+    -2px oklch(0 0 0 / 0.08);
+}
+
+.dark {
+  --background: oklch(0.166 0.009 264);
+  --foreground: oklch(0.95 0.004 264);
+
+  --card: oklch(0.204 0.011 264);
+  --card-foreground: oklch(0.95 0.004 264);
+
+  --popover: oklch(0.216 0.012 264);
+  --popover-foreground: oklch(0.95 0.004 264);
+
+  --muted: oklch(0.252 0.011 264);
+  --muted-foreground: oklch(0.69 0.012 264);
+
+  --accent: oklch(0.276 0.014 264);
+  --accent-foreground: oklch(0.95 0.004 264);
+
+  --border: oklch(0.302 0.012 264);
+  --input: oklch(0.322 0.013 264);
+  --ring: oklch(0.68 0.15 268);
+
+  --primary: oklch(0.672 0.162 268);
+  --primary-foreground: oklch(0.18 0.02 268);
+
+  --destructive: oklch(0.66 0.19 24);
+  --destructive-foreground: oklch(0.16 0.01 24);
+
+  --success: oklch(0.7 0.13 158);
+
+  --image-outline: oklch(1 0 0 / 0.1);
+  --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.08);
+  --shadow-lifted: 0 0 0 1px oklch(1 0 0 / 0.1), 0 8px 24px -10px oklch(0 0 0 / 0.6);
+}
+
+/* Map tokens to Tailwind theme variables so `bg-background`, `text-muted-foreground`, … exist. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+    letter-spacing: -0.011em;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 24%, transparent);
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+}
+
+/* A subtle shimmer used by skeletons; collapses to a static tint under reduced motion. */
+@utility skeleton {
+  background-color: var(--muted);
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-skeleton {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+/*
+ * Interactive transitions only name the properties that change (never `all`)
+ * and only run when the user has not asked for reduced motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  a,
+  button,
+  [role="menuitem"],
+  [role="option"] {
+    transition-property: background-color, border-color, color, box-shadow, opacity, scale;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+}
+
+/* Overlay content stays scroll-contained so the page behind never scrolls. */
+[data-radix-popper-content-wrapper],
+[data-scroll-locked] {
+  overscroll-behavior: contain;
+}
+
+/*
+ * Dialog enter/exit. Runs only without a reduced-motion preference; otherwise
+ * the element appears and disappears instantly.
+ */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes content-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .overlay-motion[data-state="open"] {
+    animation: overlay-in 150ms ease-out;
+  }
+  .overlay-motion[data-state="closed"] {
+    animation: overlay-out 120ms ease-out;
+  }
+  .content-motion[data-state="open"] {
+    animation: content-in 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .content-motion[data-state="closed"] {
+    animation: content-out 120ms ease-out;
+  }
+}
