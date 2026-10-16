@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Favoritos — Opções</title>
+  </head>
+  <body>
+    <main class="options">
+      <section class="card">
+        <h1 class="card__title">Conexão</h1>
+        <p class="muted">
+          Informe a URL do seu servidor de favoritos e uma chave de API criada na tela
+          <strong>/settings/api-keys</strong> do aplicativo web.
+        </p>
+
+        <form id="settings-form" class="form">
+          <label class="field">
+            <span class="field__label">URL do servidor</span>
+            <input
+              id="server-url"
+              class="input"
+              type="url"
+              placeholder="https://favoritos.exemplo.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+
+          <label class="field">
+            <span class="field__label">Chave de API</span>
+            <input
+              id="api-key"
+              class="input"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+
+          <div class="actions">
+            <button id="save" class="button" type="submit">Salvar</button>
+            <button id="test" class="button button--ghost" type="button">Testar conexão</button>
+          </div>
+        </form>
+
+        <p id="settings-status" class="status" role="status" hidden></p>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">Importar favoritos</h2>
+        <p class="muted">
+          Envia os favoritos deste navegador para o servidor. Cada pasta vira uma tag
+          hierárquica; itens já existentes são ignorados.
+        </p>
+        <button id="import" class="button" type="button">
+          Importar favoritos deste navegador
+        </button>
+        <p id="import-status" class="status" role="status" hidden></p>
+      </section>
+    </main>
+  </body>
+</html>

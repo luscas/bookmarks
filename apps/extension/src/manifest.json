@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Favoritos — Salvamento rápido",
+  "version": "0.1.0",
+  "description": "Salve a página atual, com tags, no seu servidor de favoritos auto-hospedado.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Salvar nos favoritos"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "tabs", "storage", "bookmarks", "contextMenus"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"]
+}

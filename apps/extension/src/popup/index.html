@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Salvar favorito</title>
+  </head>
+  <body>
+    <main class="popup">
+      <h1 class="popup__title">Salvar favorito</h1>
+
+      <section id="page" class="page" hidden>
+        <img id="favicon" class="page__favicon" alt="" width="16" height="16" />
+        <div class="page__text">
+          <p id="page-title" class="page__name"></p>
+          <p id="page-url" class="page__url"></p>
+        </div>
+      </section>
+
+      <p id="loading" class="muted">Carregando…</p>
+
+      <form id="form" class="form" hidden>
+        <label class="field">
+          <span class="field__label">Título</span>
+          <input id="title" class="input" type="text" maxlength="500" />
+        </label>
+        <label class="field">
+          <span class="field__label">Tags (separadas por vírgula)</span>
+          <input id="tags" class="input" type="text" placeholder="ex.: trabalho, react" />
+        </label>
+        <button id="submit" class="button" type="submit">Salvar</button>
+      </form>
+
+      <p id="notice" class="notice" hidden></p>
+      <p id="status" class="status" role="status" hidden></p>
+
+      <button id="open-options" class="button button--ghost" type="button" hidden>
+        Abrir configurações
+      </button>
+    </main>
+  </body>
+</html>
