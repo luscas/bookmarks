@@ -52,6 +52,7 @@ const existingRow: AiSettingsRow = {
   provider: "openai-compatible",
   model: "keep-me",
   baseUrl: "https://example.test/v1",
+  reasoningEffort: null,
   apiKeyCiphertext: "cipher",
   apiKeyIv: "iv",
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -69,12 +70,13 @@ describe("isDevelopment", () => {
 });
 
 describe("devAiDefaults", () => {
-  it("defaults to the local Ollama", () => {
+  it("defaults to the local Ollama with reasoning disabled", () => {
     expect(devAiDefaults(createEnv())).toEqual({
       provider: "openai-compatible",
       model: "qwen3.5:4b",
       baseUrl: "http://localhost:11434/v1",
       apiKey: "ollama",
+      reasoningEffort: "none",
     });
   });
 
@@ -92,7 +94,20 @@ describe("devAiDefaults", () => {
       model: "custom:1b",
       baseUrl: "http://ollama.test/v1",
       apiKey: "secret",
+      reasoningEffort: "none",
     });
+  });
+
+  it("honours a valid DEV_AI_REASONING_EFFORT", () => {
+    expect(devAiDefaults(createEnv({ DEV_AI_REASONING_EFFORT: "high" })).reasoningEffort).toBe(
+      "high",
+    );
+  });
+
+  it("falls back to none for a bogus DEV_AI_REASONING_EFFORT", () => {
+    expect(devAiDefaults(createEnv({ DEV_AI_REASONING_EFFORT: "ultra" })).reasoningEffort).toBe(
+      "none",
+    );
   });
 });
 
@@ -107,6 +122,7 @@ describe("ensureDevAiSettings", () => {
     expect(row?.provider).toBe("openai-compatible");
     expect(row?.model).toBe("qwen3.5:4b");
     expect(row?.baseUrl).toBe("http://localhost:11434/v1");
+    expect(row?.reasoningEffort).toBe("none");
     expect(row?.updatedAt).toBeInstanceOf(Date);
     expect(row?.apiKeyCiphertext).toBeTruthy();
     expect(row?.apiKeyIv).toBeTruthy();

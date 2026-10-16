@@ -273,6 +273,10 @@ CREATE INDEX \`apikey_config_id_idx\` ON \`apikey\` (\`config_id\`);`,
     name: "0003_import_error.sql",
     sql: "ALTER TABLE `imports` ADD `error` text;",
   },
+  {
+    name: "0004_ai_reasoning_effort.sql",
+    sql: "ALTER TABLE `ai_settings` ADD COLUMN `reasoning_effort` text;",
+  },
 ];
 
 /** Ordered migration file names, for verifying that every file is accounted for. */

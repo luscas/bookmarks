@@ -35,6 +35,42 @@ interface ChatCompletionRequest {
   model: string;
   messages: ChatMessage[];
   response_format: JsonSchemaFormat;
+  /**
+   * Only present when `AiProviderConfig.reasoningEffort` is set: providers that
+   * do not understand the field reject the whole request.
+   */
+  reasoning_effort?: string;
+}
+
+interface RequestSchema {
+  name: string;
+  schema: Record<string, unknown>;
+}
+
+/**
+ * The single place a chat-completions body is assembled, so `suggestTags` and
+ * `proposeTaxonomy` cannot drift on which optional fields they send.
+ */
+function buildRequestBody(
+  config: AiProviderConfig,
+  prompt: { system: string; user: string },
+  schema: RequestSchema,
+): ChatCompletionRequest {
+  const body: ChatCompletionRequest = {
+    model: config.model,
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: schema.name, strict: true, schema: schema.schema },
+    },
+  };
+  if (config.reasoningEffort) {
+    body.reasoning_effort = config.reasoningEffort;
+  }
+  return body;
 }
 
 const SUGGESTIONS_SCHEMA: Record<string, unknown> = {
@@ -389,17 +425,11 @@ export function createOpenAiCompatibleProvider(config: AiProviderConfig): AiProv
     const suggestions: TagSuggestion[] = [];
     for (const batch of chunked(bookmarks, AI_BATCH_SIZE)) {
       const prompt = buildSuggestTagsPrompt(batch, existingTags);
-      const content = await completeChat(config, fetchImpl, {
-        model: config.model,
-        messages: [
-          { role: "system", content: prompt.system },
-          { role: "user", content: prompt.user },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: { name: "tag_suggestions", strict: true, schema: SUGGESTIONS_SCHEMA },
-        },
+      const body = buildRequestBody(config, prompt, {
+        name: "tag_suggestions",
+        schema: SUGGESTIONS_SCHEMA,
       });
+      const content = await completeChat(config, fetchImpl, body);
       suggestions.push(...parseSuggestionsPayload(parseJsonContent(content)));
     }
     return suggestions;
@@ -412,17 +442,11 @@ export function createOpenAiCompatibleProvider(config: AiProviderConfig): AiProv
     const proposals: TaxonomyProposal[] = [];
     for (const batch of chunked(bookmarks, AI_BATCH_SIZE)) {
       const prompt = buildProposeTaxonomyPrompt(batch, existingTags);
-      const content = await completeChat(config, fetchImpl, {
-        model: config.model,
-        messages: [
-          { role: "system", content: prompt.system },
-          { role: "user", content: prompt.user },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: { name: "taxonomy_proposal", strict: true, schema: TAXONOMY_SCHEMA },
-        },
+      const body = buildRequestBody(config, prompt, {
+        name: "taxonomy_proposal",
+        schema: TAXONOMY_SCHEMA,
       });
+      const content = await completeChat(config, fetchImpl, body);
       proposals.push(parseTaxonomyPayload(parseJsonContent(content)));
     }
     return mergeProposals(proposals);

@@ -111,8 +111,9 @@ describe("runMigrations", () => {
       expect(names).toContain("bookmarks_fts");
       expect(names).toContain("user");
       expect(names).toContain(MIGRATIONS_TABLE);
-      // 0003 is a non-idempotent `ALTER TABLE ... ADD COLUMN`.
+      // 0003 and 0004 are non-idempotent `ALTER TABLE ... ADD COLUMN`s.
       expect(columnNames(db, "imports")).toContain("error");
+      expect(columnNames(db, "ai_settings")).toContain("reasoning_effort");
       expect(countRows(db, MIGRATIONS_TABLE)).toBe(MIGRATION_FILES.length);
 
       db.exec(`
@@ -148,6 +149,7 @@ describe("runMigrations", () => {
       expect(countRows(db, MIGRATIONS_TABLE)).toBe(MIGRATION_FILES.length);
       expect(tableNames(db)).toContain("bookmarks_fts");
       expect(columnNames(db, "imports")).toContain("error");
+      expect(columnNames(db, "ai_settings")).toContain("reasoning_effort");
     } finally {
       db.close();
     }

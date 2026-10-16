@@ -34,6 +34,7 @@ aiRoutes.get("/settings", async (c) => {
       provider: row.provider,
       model: row.model,
       baseUrl: row.baseUrl ?? null,
+      reasoningEffort: row.reasoningEffort ?? null,
       hasApiKey: Boolean(row.apiKeyCiphertext),
       updatedAt: row.updatedAt.toISOString(),
     },
@@ -60,6 +61,8 @@ aiRoutes.put("/settings", async (c) => {
   const nextCiphertext = ciphertext ?? existing?.apiKeyCiphertext ?? null;
   const nextIv = iv ?? existing?.apiKeyIv ?? null;
   const baseUrl = input.baseUrl ?? null;
+  // Mirrors `baseUrl`: omitting the field on the wire clears it.
+  const reasoningEffort = input.reasoningEffort ?? null;
 
   await db
     .insert(aiSettings)
@@ -68,6 +71,7 @@ aiRoutes.put("/settings", async (c) => {
       provider: input.provider,
       model: input.model,
       baseUrl,
+      reasoningEffort,
       apiKeyCiphertext: nextCiphertext,
       apiKeyIv: nextIv,
       updatedAt: now,
@@ -78,6 +82,7 @@ aiRoutes.put("/settings", async (c) => {
         provider: input.provider,
         model: input.model,
         baseUrl,
+        reasoningEffort,
         apiKeyCiphertext: nextCiphertext,
         apiKeyIv: nextIv,
         updatedAt: now,
@@ -89,6 +94,7 @@ aiRoutes.put("/settings", async (c) => {
       provider: input.provider,
       model: input.model,
       baseUrl,
+      reasoningEffort,
       hasApiKey: nextCiphertext !== null,
       updatedAt: now.toISOString(),
     },

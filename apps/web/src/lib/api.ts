@@ -1,4 +1,5 @@
 import {
+  type AiReasoningEffort,
   type Bookmark,
   type BookmarkPage,
   type BookmarkSort,
@@ -8,6 +9,7 @@ import {
   type Tag,
   type UpdateBookmarkInput,
   type UpdateTagInput,
+  aiReasoningEffortEnum,
   aiSettingsInputSchema,
   bookmarkSchema,
   pageSchema,
@@ -259,6 +261,7 @@ export interface AiSettings {
   provider: string;
   model: string;
   baseUrl: string | null;
+  reasoningEffort: AiReasoningEffort | null;
   hasApiKey: boolean;
   updatedAt: string;
 }
@@ -267,6 +270,7 @@ const aiSettingsSchema = z.object({
   provider: z.string(),
   model: z.string(),
   baseUrl: z.string().nullable(),
+  reasoningEffort: aiReasoningEffortEnum.nullable(),
   hasApiKey: z.boolean(),
   updatedAt: z.string(),
 });

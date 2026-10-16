@@ -32,6 +32,13 @@ export interface AiProviderConfig {
   model: string;
   /** Base URL of a chat-completions-compatible API; defaults to OpenAI. */
   baseUrl?: string;
+  /**
+   * Controls how much the model "thinks" before answering. Only sent when set,
+   * because some OpenAI-compatible providers (and some OpenAI models) reject the
+   * field outright. On Ollama-style servers `"none"` disables thinking, cutting
+   * latency from minutes to seconds on reasoning models.
+   */
+  reasoningEffort?: "none" | "low" | "medium" | "high";
   /** Injectable `fetch` so tests (and runtimes) can supply their own. */
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;

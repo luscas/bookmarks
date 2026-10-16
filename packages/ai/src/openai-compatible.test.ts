@@ -12,6 +12,7 @@ interface RecordedBody {
     type: string;
     json_schema: { name: string; strict: boolean; schema: unknown };
   };
+  reasoning_effort?: string;
 }
 
 interface RecordedCall {
@@ -117,6 +118,62 @@ describe("createOpenAiCompatibleProvider request", () => {
     await provider.suggestTags(ONE_BOOKMARK, []);
 
     expect(firstCall(calls).url).toBe("https://api.openai.com/v1/chat/completions");
+  });
+});
+
+describe("createOpenAiCompatibleProvider reasoning_effort", () => {
+  it("sends reasoning_effort on suggestTags when configured", async () => {
+    const { fetchImpl, calls } = createFakeFetch(() =>
+      completionResponse(JSON.stringify({ suggestions: [] })),
+    );
+    const provider = createOpenAiCompatibleProvider({
+      apiKey: "k",
+      model: "m",
+      reasoningEffort: "none",
+      fetchImpl,
+    });
+
+    await provider.suggestTags(ONE_BOOKMARK, []);
+
+    expect(firstCall(calls).body.reasoning_effort).toBe("none");
+  });
+
+  it("omits reasoning_effort on suggestTags when unset", async () => {
+    const { fetchImpl, calls } = createFakeFetch(() =>
+      completionResponse(JSON.stringify({ suggestions: [] })),
+    );
+    const provider = createOpenAiCompatibleProvider({ apiKey: "k", model: "m", fetchImpl });
+
+    await provider.suggestTags(ONE_BOOKMARK, []);
+
+    expect("reasoning_effort" in firstCall(calls).body).toBe(false);
+  });
+
+  it("sends reasoning_effort on proposeTaxonomy when configured", async () => {
+    const { fetchImpl, calls } = createFakeFetch(() =>
+      completionResponse(JSON.stringify({ tags: [], assignments: [] })),
+    );
+    const provider = createOpenAiCompatibleProvider({
+      apiKey: "k",
+      model: "m",
+      reasoningEffort: "low",
+      fetchImpl,
+    });
+
+    await provider.proposeTaxonomy(ONE_BOOKMARK, []);
+
+    expect(firstCall(calls).body.reasoning_effort).toBe("low");
+  });
+
+  it("omits reasoning_effort on proposeTaxonomy when unset", async () => {
+    const { fetchImpl, calls } = createFakeFetch(() =>
+      completionResponse(JSON.stringify({ tags: [], assignments: [] })),
+    );
+    const provider = createOpenAiCompatibleProvider({ apiKey: "k", model: "m", fetchImpl });
+
+    await provider.proposeTaxonomy(ONE_BOOKMARK, []);
+
+    expect("reasoning_effort" in firstCall(calls).body).toBe(false);
   });
 });
 

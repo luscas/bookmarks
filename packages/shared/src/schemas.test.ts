@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { MAX_FOLDER_PATH_DEPTH, MAX_IMPORT_ITEMS, MAX_URL_LENGTH } from "./constants.js";
-import { bulkBookmarkItemSchema, bulkBookmarksSchema, createImportSchema } from "./schemas.js";
+import {
+  aiSettingsInputSchema,
+  bulkBookmarkItemSchema,
+  bulkBookmarksSchema,
+  createImportSchema,
+} from "./schemas.js";
 
 describe("createImportSchema", () => {
   it("accepts an item list within the cap", () => {
@@ -72,5 +77,29 @@ describe("bulkBookmarksSchema", () => {
   it("keeps the extension's 1000-item bulk cap", () => {
     const items = Array.from({ length: 1001 }, () => ({ url: "https://a.test" }));
     expect(bulkBookmarksSchema.safeParse({ items }).success).toBe(false);
+  });
+});
+
+describe("aiSettingsInputSchema reasoningEffort", () => {
+  const base = { provider: "openai-compatible", model: "gpt-4o-mini" } as const;
+
+  it("accepts each configured effort value", () => {
+    for (const effort of ["none", "low", "medium", "high"] as const) {
+      const parsed = aiSettingsInputSchema.parse({ ...base, reasoningEffort: effort });
+      expect(parsed.reasoningEffort).toBe(effort);
+    }
+  });
+
+  it("accepts an explicit null and an omitted value", () => {
+    expect(
+      aiSettingsInputSchema.parse({ ...base, reasoningEffort: null }).reasoningEffort,
+    ).toBeNull();
+    expect("reasoningEffort" in aiSettingsInputSchema.parse(base)).toBe(false);
+  });
+
+  it("rejects an unknown effort value", () => {
+    expect(aiSettingsInputSchema.safeParse({ ...base, reasoningEffort: "ultra" }).success).toBe(
+      false,
+    );
   });
 });

@@ -1,6 +1,6 @@
 import type { AiProvider, BookmarkForAi, CreateProviderConfig } from "@bookmarks/ai";
 import { createProvider } from "@bookmarks/ai";
-import type { AiJobRow, Database } from "@bookmarks/db";
+import type { AiJobRow, AiSettingsRow, Database } from "@bookmarks/db";
 import { aiJobs, bookmarks, tags } from "@bookmarks/db";
 import type { AiJobType } from "@bookmarks/shared";
 import { MAX_TAGS_PER_BOOKMARK } from "@bookmarks/shared";
@@ -25,6 +25,29 @@ function toBookmarkForAi(row: {
   return { id: row.id, url: row.url, title: row.title, description: row.description };
 }
 
+/** Settings fields that shape the provider config. */
+type ProviderSettings = Pick<AiSettingsRow, "provider" | "model" | "baseUrl" | "reasoningEffort">;
+
+/**
+ * Assemble the provider config, adding optional fields only when they are set —
+ * some providers reject `reasoning_effort` outright, so an unset value must be
+ * omitted rather than defaulted.
+ */
+export function toProviderConfig(settings: ProviderSettings, apiKey: string): CreateProviderConfig {
+  const config: CreateProviderConfig = {
+    provider: settings.provider,
+    model: settings.model,
+    apiKey,
+  };
+  if (settings.baseUrl) {
+    config.baseUrl = settings.baseUrl;
+  }
+  if (settings.reasoningEffort) {
+    config.reasoningEffort = settings.reasoningEffort;
+  }
+  return config;
+}
+
 async function buildProvider(env: Env, db: Database, userId: string): Promise<AiProvider | null> {
   // In development this provisions the local Ollama on first use, so AI jobs
   // work with zero manual configuration; production is unaffected.
@@ -36,15 +59,7 @@ async function buildProvider(env: Env, db: Database, userId: string): Promise<Ai
     { ciphertext: settings.apiKeyCiphertext, iv: settings.apiKeyIv },
     env.AI_KEY_ENCRYPTION_SECRET,
   );
-  const config: CreateProviderConfig = {
-    provider: settings.provider,
-    model: settings.model,
-    apiKey,
-  };
-  if (settings.baseUrl) {
-    config.baseUrl = settings.baseUrl;
-  }
-  return createProvider(config);
+  return createProvider(toProviderConfig(settings, apiKey));
 }
 
 async function listTagNames(db: Database, userId: string): Promise<string[]> {

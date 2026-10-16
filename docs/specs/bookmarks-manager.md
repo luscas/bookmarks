@@ -472,11 +472,18 @@ Decisões conscientes, com o risco residual que cada uma assume:
   não tem linha em `ai_settings`, via `onConflictDoNothing`). É um `GET` com
   efeito colateral, aceito por ser exclusivo de desenvolvimento; em produção é
   um no-op e a rota continua somente-leitura.
-- **Sem timeout nem limite de tokens na chamada ao provedor de IA**: o adapter
-  OpenAI-compatible (`packages/ai/src/openai-compatible.ts`) não define timeout
-  de requisição nem `max_tokens`/teto de tokens. Um modelo "pensante" pode
-  consumir latência e tokens sem limite superior. Aceito por ora; deve ser
-  resolvido antes de uso em escala com IA habilitada.
+- **Latência do raciocínio do modelo resolvida com `reasoning_effort` (sem timeout
+  e sem teto de tokens, por decisão)**: um modelo "pensante" podia consumir
+  latência sem limite superior (medido: 76–126 s por chamada). Com
+  `reasoning_effort: "none"` a mesma chamada cai para **2.4–2.7 s** (~50x mais
+  rápido; medido contra ollama 0.40.5 / qwen3.5:4b em um lote de 3 favoritos).
+  O valor é configurável por usuário (`ai_settings.reasoning_effort`, `null` =
+  padrão do provedor) e o Ollama de dev usa `none` por padrão
+  (`DEV_AI_REASONING_EFFORT`). Dois resíduos deliberados: (a) a chamada ao
+  provedor continua **sem timeout de requisição**; (b) um teto de tokens é
+  deliberadamente **não** aplicado — com raciocínio habilitado, um teto trunca a
+  resposta para conteúdo vazio (`finish_reason: "length"`), o que é pior do que
+  lento.
 - **Lote de `tag_bookmarks` sem fatiamento**: `runImport` passa **todos** os ids
   importados (até `MAX_IMPORT_ITEMS`) em um único job `tag_bookmarks`. Os
   consumidores da fila são processados sequencialmente e estão sujeitos ao

@@ -27,6 +27,13 @@ export type TagSource = z.infer<typeof tagSourceEnum>;
 export const aiProviderEnum = z.enum(["openai-compatible"]);
 export type AiProviderId = z.infer<typeof aiProviderEnum>;
 
+/**
+ * How much the model may "think" before answering. `"none"` disables thinking on
+ * Ollama-style servers; `null`/omitted lets the provider use its default.
+ */
+export const aiReasoningEffortEnum = z.enum(["none", "low", "medium", "high"]);
+export type AiReasoningEffort = z.infer<typeof aiReasoningEffortEnum>;
+
 export const importSourceEnum = z.enum(["chrome-json", "html"]);
 export type ImportSource = z.infer<typeof importSourceEnum>;
 
@@ -149,6 +156,11 @@ export const aiSettingsInputSchema = z.object({
   provider: aiProviderEnum,
   model: z.string().trim().min(1).max(200),
   baseUrl: z.string().url().optional(),
+  /**
+   * `null`/omitted clears the setting so the provider's own default applies;
+   * only sent to the provider when a value is configured.
+   */
+  reasoningEffort: aiReasoningEffortEnum.nullish(),
   /** Omit to keep the stored key unchanged. */
   apiKey: z.string().trim().min(1).optional(),
 });

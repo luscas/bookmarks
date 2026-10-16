@@ -1,6 +1,7 @@
 import type { AiSettingsRow, Database } from "@bookmarks/db";
 import { aiSettings } from "@bookmarks/db";
-import type { AiProviderId } from "@bookmarks/shared";
+import type { AiProviderId, AiReasoningEffort } from "@bookmarks/shared";
+import { aiReasoningEffortEnum } from "@bookmarks/shared";
 import { eq } from "drizzle-orm";
 import type { Env } from "../env.js";
 import { encryptApiKey } from "./crypto.js";
@@ -18,6 +19,12 @@ import { encryptApiKey } from "./crypto.js";
 const DEV_AI_DEFAULT_MODEL = "qwen3.5:4b";
 const DEV_AI_DEFAULT_BASE_URL = "http://localhost:11434/v1";
 const DEV_AI_DEFAULT_API_KEY = "ollama";
+/**
+ * Disables the reasoning trace on the dev Ollama, which otherwise spends
+ * thousands of tokens "thinking" before emitting a few hundred characters of
+ * JSON (turning a ~2.5s call into 76–126s).
+ */
+const DEV_AI_DEFAULT_REASONING_EFFORT: AiReasoningEffort = "none";
 
 /** Provider used for the dev defaults; the only one that ships in phase 1. */
 const DEV_AI_PROVIDER: AiProviderId = "openai-compatible";
@@ -27,6 +34,13 @@ export interface DevAiDefaults {
   model: string;
   baseUrl: string;
   apiKey: string;
+  reasoningEffort: AiReasoningEffort;
+}
+
+/** Accept a valid `DEV_AI_REASONING_EFFORT`, otherwise fall back to `"none"`. */
+function resolveReasoningEffort(value: string | undefined): AiReasoningEffort {
+  const parsed = aiReasoningEffortEnum.safeParse(value);
+  return parsed.success ? parsed.data : DEV_AI_DEFAULT_REASONING_EFFORT;
 }
 
 /** True only when the server runs with `NODE_ENV=development`. */
@@ -41,6 +55,7 @@ export function devAiDefaults(env: Env): DevAiDefaults {
     model: env.DEV_AI_MODEL ?? DEV_AI_DEFAULT_MODEL,
     baseUrl: env.DEV_AI_BASE_URL ?? DEV_AI_DEFAULT_BASE_URL,
     apiKey: env.DEV_AI_API_KEY ?? DEV_AI_DEFAULT_API_KEY,
+    reasoningEffort: resolveReasoningEffort(env.DEV_AI_REASONING_EFFORT),
   };
 }
 
@@ -68,6 +83,7 @@ export async function ensureDevAiSettings(env: Env, db: Database, userId: string
       provider: defaults.provider,
       model: defaults.model,
       baseUrl: defaults.baseUrl,
+      reasoningEffort: defaults.reasoningEffort,
       apiKeyCiphertext: encrypted.ciphertext,
       apiKeyIv: encrypted.iv,
       updatedAt: new Date(),

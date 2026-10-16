@@ -2,6 +2,7 @@ import type {
   AiJobStatus,
   AiJobType,
   AiProviderId,
+  AiReasoningEffort,
   BookmarkSource,
   ImportSource,
   TagKind,
@@ -227,6 +228,11 @@ export const aiSettings = sqliteTable("ai_settings", {
   provider: text("provider").$type<AiProviderId>().notNull(),
   model: text("model").notNull(),
   baseUrl: text("base_url"),
+  /**
+   * Only sent to the provider when set; `null` means "let the provider decide".
+   * `"none"` disables thinking on Ollama-style servers.
+   */
+  reasoningEffort: text("reasoning_effort").$type<AiReasoningEffort>(),
   apiKeyCiphertext: text("api_key_ciphertext"),
   apiKeyIv: text("api_key_iv"),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(epochMs),

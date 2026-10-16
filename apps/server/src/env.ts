@@ -32,4 +32,6 @@ export interface Env {
   DEV_AI_MODEL?: string;
   DEV_AI_BASE_URL?: string;
   DEV_AI_API_KEY?: string;
+  /** One of `none|low|medium|high`; invalid values fall back to `none`. */
+  DEV_AI_REASONING_EFFORT?: string;
 }

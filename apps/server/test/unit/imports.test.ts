@@ -182,6 +182,7 @@ describe("runImport autoTag default", () => {
 
     expect(summary.imported).toBe(1);
     expect(aiSettingsInserts).toHaveLength(1);
+    expect(aiSettingsInserts[0]?.reasoningEffort).toBe("none");
     expect(aiJobInserts).toHaveLength(1);
     expect(aiJobInserts[0]?.type).toBe("tag_bookmarks");
 

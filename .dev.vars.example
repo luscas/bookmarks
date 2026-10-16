@@ -14,3 +14,5 @@ NODE_ENV=development
 DEV_AI_MODEL=qwen3.5:4b
 DEV_AI_BASE_URL=http://localhost:11434/v1
 DEV_AI_API_KEY=ollama
+# Disables thinking tokens on Ollama; ~50x faster tagging
+DEV_AI_REASONING_EFFORT=none

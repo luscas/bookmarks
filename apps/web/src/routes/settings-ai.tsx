@@ -1,4 +1,8 @@
-import { type AiSettingsInput, aiSettingsInputSchema } from "@bookmarks/shared";
+import {
+  type AiReasoningEffort,
+  type AiSettingsInput,
+  aiSettingsInputSchema,
+} from "@bookmarks/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
@@ -135,6 +139,7 @@ export function AiSettingsPage() {
   const [provider, setProvider] = useState<"openai-compatible">("openai-compatible");
   const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [reasoningEffort, setReasoningEffort] = useState<AiReasoningEffort | "">("");
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -145,6 +150,7 @@ export function AiSettingsPage() {
       setProvider(settings.provider as "openai-compatible");
       setModel(settings.model);
       setBaseUrl(settings.baseUrl ?? "");
+      setReasoningEffort(settings.reasoningEffort ?? "");
     }
   }, [settingsQuery.data]);
 
@@ -174,6 +180,8 @@ export function AiSettingsPage() {
       provider,
       model: model.trim(),
       ...(baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}),
+      // Omitted on the wire, like `baseUrl`, so the stored value is cleared.
+      ...(reasoningEffort ? { reasoningEffort } : {}),
       ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
     });
     if (!parsed.success) {
@@ -248,6 +256,27 @@ export function AiSettingsPage() {
                     placeholder="https://api.openai.com/v1"
                     onChange={(event) => setBaseUrl(event.target.value)}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ai-reasoning-effort">Esforço de raciocínio</Label>
+                  <Select
+                    id="ai-reasoning-effort"
+                    value={reasoningEffort}
+                    onChange={(event) =>
+                      setReasoningEffort(event.target.value as AiReasoningEffort | "")
+                    }
+                  >
+                    <option value="">(padrão do provedor)</option>
+                    <option value="none">none</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Quanto o modelo pode "pensar" antes de responder; none desativa o raciocínio e
+                    acelera o tagging em modelos locais.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
