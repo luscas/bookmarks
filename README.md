@@ -22,11 +22,11 @@ packages/ai       AI provider interface + adapters
 ## Develop
 
 ```bash
-pnpm install
-pnpm dev            # runs server, web and extension in watch mode
+just start-all      # deps + segredos + migrações D1, depois API (:8787) + SPA (:3000) + extensão (watch)
 ```
 
-The Worker needs local secrets — copy `.dev.vars.example` to `.dev.vars` and fill it in.
+`just start-all` gera `apps/server/.dev.vars` com segredos aleatórios na primeira execução — edite o arquivo para trocá-los.
+Rode `just --list` para as receitas individuais (`dev-server`, `dev-web`, `dev-extension`, `test`, `check`, `build`).
 
 ## Deploy
 
