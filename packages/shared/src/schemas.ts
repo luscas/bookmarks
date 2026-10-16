@@ -130,8 +130,12 @@ export const createImportSchema = z
     source: importSourceEnum,
     items: z.array(bulkBookmarkItemSchema).max(MAX_IMPORT_ITEMS).optional(),
     html: z.string().optional(),
-    /** Enqueue AI tagging for everything the import creates. */
-    autoTag: z.boolean().default(false),
+    /**
+     * Enqueue AI tagging for everything the import creates. Omit to use the
+     * server default (in `NODE_ENV=development` it defaults to `true`, so the
+     * local Ollama organises imports automatically; `false` everywhere else).
+     */
+    autoTag: z.boolean().optional(),
   })
   .refine((value) => Boolean(value.items?.length || value.html), {
     message: "Provide either `items` or `html`",

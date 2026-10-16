@@ -1,12 +1,13 @@
 import type { AiProvider, BookmarkForAi, CreateProviderConfig } from "@bookmarks/ai";
 import { createProvider } from "@bookmarks/ai";
 import type { AiJobRow, Database } from "@bookmarks/db";
-import { aiJobs, aiSettings, bookmarks, tags } from "@bookmarks/db";
+import { aiJobs, bookmarks, tags } from "@bookmarks/db";
 import type { AiJobType } from "@bookmarks/shared";
 import { MAX_TAGS_PER_BOOKMARK } from "@bookmarks/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../db.js";
 import type { AiJobMessage, Env } from "../env.js";
+import { getOrProvisionAiSettings } from "./ai-config.js";
 import { selectBookmarks } from "./bookmarks.js";
 import { decryptApiKey } from "./crypto.js";
 import { newId } from "./ids.js";
@@ -25,7 +26,9 @@ function toBookmarkForAi(row: {
 }
 
 async function buildProvider(env: Env, db: Database, userId: string): Promise<AiProvider | null> {
-  const settings = await db.select().from(aiSettings).where(eq(aiSettings.userId, userId)).get();
+  // In development this provisions the local Ollama on first use, so AI jobs
+  // work with zero manual configuration; production is unaffected.
+  const settings = await getOrProvisionAiSettings(env, db, userId);
   if (!settings?.apiKeyCiphertext || !settings.apiKeyIv) {
     return null;
   }

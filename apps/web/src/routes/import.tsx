@@ -1,7 +1,7 @@
 import { MAX_IMPORT_HTML_BYTES } from "@bookmarks/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, FileUp, Loader2, Upload } from "lucide-react";
-import { type ChangeEvent, type FormEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { EmptyState } from "../components/empty-state";
 import { ErrorState } from "../components/error-state";
 import { PageHeader } from "../components/page-header";
@@ -82,6 +82,21 @@ export function ImportPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [autoTag, setAutoTag] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Default the checkbox from the server's dev-only hint, without overriding a
+  // toggle the user already made. Production reports `false`, so the box starts
+  // unchecked there exactly as before.
+  const autoTagTouched = useRef(false);
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.aiSettings,
+    queryFn: () => api.ai.getSettings(),
+  });
+  const autoTagByDefault = settingsQuery.data?.autoTagByDefault ?? false;
+  useEffect(() => {
+    if (!autoTagTouched.current && settingsQuery.isSuccess) {
+      setAutoTag(autoTagByDefault);
+    }
+  }, [autoTagByDefault, settingsQuery.isSuccess]);
 
   const runImport = useMutation({
     mutationFn: () => api.imports.create({ source: "html", html, autoTag }),
@@ -180,13 +195,16 @@ export function ImportPage() {
               <input
                 type="checkbox"
                 checked={autoTag}
-                onChange={(event) => setAutoTag(event.target.checked)}
+                onChange={(event) => {
+                  autoTagTouched.current = true;
+                  setAutoTag(event.target.checked);
+                }}
                 className="mt-0.5 size-4 rounded border-input accent-[var(--primary)] focus-visible:ring-2 focus-visible:ring-ring"
               />
               <span>
-                Sugerir tags automaticamente
+                Organizar com IA
                 <span className="block text-xs text-muted-foreground">
-                  Envia os favoritos importados para a IA. Requer a IA configurada.
+                  Usa o modelo de IA configurado para sugerir tags aos favoritos importados.
                 </span>
               </span>
             </label>

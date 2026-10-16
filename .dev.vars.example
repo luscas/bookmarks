@@ -1,0 +1,16 @@
+# Better Auth
+BETTER_AUTH_SECRET=replace-with-a-long-random-string
+BETTER_AUTH_URL=http://localhost:8787
+
+# AES-GCM key (base64, 32 bytes) used to encrypt per-user AI provider API keys at rest.
+# Generate with: openssl rand -base64 32
+AI_KEY_ENCRYPTION_SECRET=replace-with-base64-32-bytes
+
+# Comma-separated allowed origin(s) for the SPA / extension during local dev
+TRUSTED_ORIGINS=http://localhost:3000
+
+# Dev-only: local Ollama used to organise imported bookmarks. Never deployed.
+NODE_ENV=development
+DEV_AI_MODEL=qwen3.5:4b
+DEV_AI_BASE_URL=http://localhost:11434/v1
+DEV_AI_API_KEY=ollama

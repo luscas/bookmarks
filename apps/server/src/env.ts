@@ -22,4 +22,14 @@ export interface Env {
   BETTER_AUTH_URL: string;
   AI_KEY_ENCRYPTION_SECRET: string;
   TRUSTED_ORIGINS: string;
+  /**
+   * Dev-only: set to `development` by the git-ignored `apps/server/.dev.vars`
+   * to enable local Ollama defaults. Never set in production, so `undefined`
+   * keeps today's behavior there.
+   */
+  NODE_ENV?: string;
+  /** Dev-only overrides for the pre-configured local Ollama (see `ai-config.ts`). */
+  DEV_AI_MODEL?: string;
+  DEV_AI_BASE_URL?: string;
+  DEV_AI_API_KEY?: string;
 }

@@ -16,6 +16,31 @@ describe("createImportSchema", () => {
     const result = createImportSchema.safeParse({ source: "chrome-json", items });
     expect(result.success).toBe(false);
   });
+
+  it("leaves autoTag absent by default so the server can decide", () => {
+    const result = createImportSchema.parse({
+      source: "chrome-json",
+      items: [{ url: "https://a.test" }],
+    });
+    expect(result.autoTag).toBeUndefined();
+    expect("autoTag" in result).toBe(false);
+  });
+
+  it("keeps an explicit autoTag value", () => {
+    const on = createImportSchema.parse({
+      source: "chrome-json",
+      items: [{ url: "https://a.test" }],
+      autoTag: true,
+    });
+    expect(on.autoTag).toBe(true);
+
+    const off = createImportSchema.parse({
+      source: "chrome-json",
+      items: [{ url: "https://a.test" }],
+      autoTag: false,
+    });
+    expect(off.autoTag).toBe(false);
+  });
 });
 
 describe("bulkBookmarkItemSchema", () => {

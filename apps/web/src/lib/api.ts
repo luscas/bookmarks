@@ -450,7 +450,9 @@ export const api = {
         body: {
           source: params.source,
           ...(params.html !== undefined ? { html: params.html } : {}),
-          autoTag: params.autoTag ?? false,
+          // Omit when undefined so the server can apply its own default (in
+          // development it triggers local AI tagging on import).
+          ...(params.autoTag !== undefined ? { autoTag: params.autoTag } : {}),
         },
         schema: z.object({ import: importSummarySchema }),
       }).then((data) => data.import);
@@ -463,10 +465,14 @@ export const api = {
   },
 
   ai: {
-    getSettings(): Promise<AiSettings | null> {
+    getSettings(): Promise<{ settings: AiSettings | null; autoTagByDefault: boolean }> {
       return apiRequest("/ai/settings", {
-        schema: z.object({ settings: aiSettingsSchema.nullable() }),
-      }).then((data) => data.settings);
+        schema: z.object({
+          settings: aiSettingsSchema.nullable(),
+          // Dev-only default for the import checkbox; `false` in production.
+          autoTagByDefault: z.boolean(),
+        }),
+      });
     },
     saveSettings(input: AiSettingsInput): Promise<AiSettings> {
       return apiRequest("/ai/settings", {

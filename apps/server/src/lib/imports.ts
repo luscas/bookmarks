@@ -4,6 +4,7 @@ import type { BulkBookmarkItem, CreateImportInput, ImportSource } from "@bookmar
 import { MAX_IMPORT_HTML_BYTES } from "@bookmarks/shared";
 import { and, desc, eq } from "drizzle-orm";
 import type { Env } from "../env.js";
+import { ensureDevAiSettings, isDevelopment } from "./ai-config.js";
 import { createAiJob } from "./ai-jobs.js";
 import { bulkCreateBookmarks } from "./bookmarks.js";
 import { chunk } from "./chunk.js";
@@ -132,8 +133,23 @@ export async function runImport(
       .set({ status: "done", total: items.length, imported, skipped, finishedAt })
       .where(eq(imports.id, id));
 
-    if (input.autoTag && bookmarkIds.length > 0) {
-      await createAiJob(env, db, userId, "tag_bookmarks", { bookmarkIds });
+    const shouldAutoTag = input.autoTag ?? isDevelopment(env);
+    if (shouldAutoTag && bookmarkIds.length > 0) {
+      // AI provisioning/enqueue is a convenience layered on top of a successful
+      // import, so a failure here (e.g. a malformed `AI_KEY_ENCRYPTION_SECRET`)
+      // must not rewrite the persisted `done` row to `failed` or fail the
+      // request; the import already succeeded. The job just isn't enqueued.
+      try {
+        // In development make sure the local Ollama settings exist before the
+        // queued job runs; production is a no-op and never provisions anything.
+        await ensureDevAiSettings(env, db, userId);
+        await createAiJob(env, db, userId, "tag_bookmarks", { bookmarkIds });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.error(
+          `Import ${id} for user ${userId}: AI tagging setup failed (import kept as done): ${reason}`,
+        );
+      }
     }
 
     return {

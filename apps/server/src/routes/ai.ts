@@ -6,6 +6,7 @@ import {
 } from "@bookmarks/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { getOrProvisionAiSettings, isDevelopment } from "../lib/ai-config.js";
 import { createAiJob, getAiJobById, listAiJobs, toJobSummary } from "../lib/ai-jobs.js";
 import { encryptApiKey } from "../lib/crypto.js";
 import { notFound } from "../lib/http.js";
@@ -19,14 +20,14 @@ aiRoutes.use("*", sessionMiddleware);
 
 aiRoutes.get("/settings", async (c) => {
   const user = requireUser(c);
-  const row = await c
-    .get("db")
-    .select()
-    .from(aiSettings)
-    .where(eq(aiSettings.userId, user.id))
-    .get();
+  // Provision the dev Ollama when needed so the UI shows the pre-configured
+  // model; production still reports `null` until the user configures one.
+  const row = await getOrProvisionAiSettings(c.env, c.get("db"), user.id);
+  // The dev-only default for the import page's "organise with AI" checkbox;
+  // production always reports `false`, so its behaviour is unchanged.
+  const autoTagByDefault = isDevelopment(c.env);
   if (!row) {
-    return c.json({ settings: null });
+    return c.json({ settings: null, autoTagByDefault });
   }
   return c.json({
     settings: {
@@ -36,6 +37,7 @@ aiRoutes.get("/settings", async (c) => {
       hasApiKey: Boolean(row.apiKeyCiphertext),
       updatedAt: row.updatedAt.toISOString(),
     },
+    autoTagByDefault,
   });
 });
 

@@ -140,7 +140,7 @@ export function AiSettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const settings = settingsQuery.data;
+    const settings = settingsQuery.data?.settings;
     if (settings) {
       setProvider(settings.provider as "openai-compatible");
       setModel(settings.model);
@@ -183,7 +183,7 @@ export function AiSettingsPage() {
     save.mutate(parsed.data);
   }
 
-  const settings = settingsQuery.data;
+  const settings = settingsQuery.data?.settings;
 
   return (
     <div className="space-y-6">

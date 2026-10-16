@@ -13,6 +13,8 @@ build/
 .wrangler/
 .dev.vars
 .dev.vars.*
+# ...but keep the committed template (a fresh clone needs it for `just env`).
+!.dev.vars.example
 
 # tests
 coverage/

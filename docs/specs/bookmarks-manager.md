@@ -239,6 +239,10 @@ Convenções:
 | `POST` | `/api/imports` | `{ source: "html"\|"chrome-json", items?, html?, autoTag? }` (exige `items` ou `html`) → `{ import }` (`201`). `413` se o HTML exceder 10 MiB. |
 | `GET` | `/api/imports/:id` | → `{ import }` ou `404`. |
 
+- Em `NODE_ENV=development` o servidor pré-configura um Ollama local
+  (`qwen3.5:4b` em `http://localhost:11434/v1`) e dispara a organização por IA
+  na importação por padrão; isso nunca se aplica em produção.
+
 ### IA
 
 | Método | Caminho | Corpo / resposta |
@@ -462,4 +466,22 @@ Decisões conscientes, com o risco residual que cada uma assume:
   `dead_letter_queue: "bookmarks-ai-dlq"` em `apps/server/wrangler.jsonc`, mas
   nenhum Worker consome essa DLQ; mensagens que esgotam `max_retries` ficam
   paradas na fila.
+- **`GET /api/ai/settings` com efeito de escrita no modo dev**: em
+  `NODE_ENV=development` essa rota provisiona de forma preguiçosa as
+  configurações do Ollama local (idempotente: só insere quando o usuário ainda
+  não tem linha em `ai_settings`, via `onConflictDoNothing`). É um `GET` com
+  efeito colateral, aceito por ser exclusivo de desenvolvimento; em produção é
+  um no-op e a rota continua somente-leitura.
+- **Sem timeout nem limite de tokens na chamada ao provedor de IA**: o adapter
+  OpenAI-compatible (`packages/ai/src/openai-compatible.ts`) não define timeout
+  de requisição nem `max_tokens`/teto de tokens. Um modelo "pensante" pode
+  consumir latência e tokens sem limite superior. Aceito por ora; deve ser
+  resolvido antes de uso em escala com IA habilitada.
+- **Lote de `tag_bookmarks` sem fatiamento**: `runImport` passa **todos** os ids
+  importados (até `MAX_IMPORT_ITEMS`) em um único job `tag_bookmarks`. Os
+  consumidores da fila são processados sequencialmente e estão sujeitos ao
+  limite de 15 minutos de wall-clock por invocação do Cloudflare — uma execução
+  real levou ~150 s para um lote de apenas 3 favoritos. Aceito por ora; deve ser
+  endereçado (fatiar o payload em jobs menores) antes de importações grandes com
+  IA habilitada.
 
